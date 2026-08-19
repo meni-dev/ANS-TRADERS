@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: two_wheeler_spare_parts
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d two_wheeler_spare_parts"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    restart: unless-stopped
+    working_dir: /src/src/Api
+    command: ["dotnet", "run", "--no-launch-profile", "--urls", "http://0.0.0.0:5266"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=two_wheeler_spare_parts;Username=postgres;Password=postgres"
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    ports:
+      - "5266:5266"
+    volumes:
+      - .:/src
+      - nuget_packages:/root/.nuget/packages
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  nuget_packages:

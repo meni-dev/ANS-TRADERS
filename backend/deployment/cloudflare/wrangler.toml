@@ -1,0 +1,17 @@
+name = "ans-api"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+# The Function URL AWS gave you, with its trailing slash:
+#   https://<id>.lambda-url.<region>.on.aws/
+#
+# Kept as a plain variable rather than a secret — it is a hostname, not a credential, and the
+# function's own auth type is NONE. What guards the API is the session token the app checks on
+# every request, exactly as it does locally.
+[vars]
+LAMBDA_FUNCTION_URL = "https://replace-me.lambda-url.ap-south-1.on.aws/"
+
+# Point the subdomain at this Worker. The zone has to be one Cloudflare already manages for you.
+[[routes]]
+pattern = "api.example.com/*"
+zone_name = "example.com"

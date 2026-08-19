@@ -1,0 +1,6 @@
+# Every path is handled by the app, not by a file on disk.
+#
+# Without this, Cloudflare Pages looks for /reports/index.html, does not find it, and returns 404 —
+# so the app works until somebody refreshes the page they are on, or opens a link somebody sent
+# them. The 200 matters: a 302 would change the address bar and lose the route.
+/*    /index.html    200
