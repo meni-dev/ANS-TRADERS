@@ -1,5 +1,6 @@
 using Application.Interfaces;
 using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,6 +49,9 @@ public class ReportRepository : IReportRepository
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken) =>
         await _context.CreditNotes
             .AsNoTracking()
+            // With their lines: Table 8 and 3B decide line by line which are taxable and which are
+            // not, and a note loaded without them silently nets nothing at all.
+            .Include(n => n.Items)
             .Where(n => n.NoteDate >= fromDate && n.NoteDate <= toDate)
             .OrderBy(n => n.NoteDate)
             .ThenBy(n => n.Sequence)
@@ -110,19 +114,51 @@ public class ReportRepository : IReportRepository
             .OrderBy(p => p.PartNumber)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Invoice>> GetOpenInvoicesAsync(CancellationToken cancellationToken) =>
+        await _context.Invoices
+            .AsNoTracking()
+            .Where(i => i.Status != InvoiceStatus.Cancelled && i.BalanceDue > 0)
+            .OrderBy(i => i.CustomerName)
+            .ThenBy(i => i.InvoiceDate)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, decimal>> GetStockBalancesOnAsync(
+        DateOnly onDate, CancellationToken cancellationToken) =>
+        await _context.StockMovements
+            .AsNoTracking()
+            .Where(m => m.MovementDate <= onDate)
+            .GroupBy(m => m.ProductId)
+            .Select(g => new { ProductId = g.Key, Balance = g.Sum(m => m.Quantity) })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Balance, cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, decimal>> GetPartyBalancesOnAsync(
+        DateOnly onDate, bool customers, CancellationToken cancellationToken) =>
+        await _context.PartyLedgerEntries
+            .AsNoTracking()
+            .Where(e => e.EntryDate <= onDate
+                        && (customers ? e.CustomerId != null : e.SupplierId != null))
+            .GroupBy(e => customers ? e.CustomerId!.Value : e.SupplierId!.Value)
+            .Select(g => new { PartyId = g.Key, Balance = g.Sum(e => e.Amount) })
+            .ToDictionaryAsync(x => x.PartyId, x => x.Balance, cancellationToken);
+
+    public async Task<decimal> GetStockBalanceBeforeAsync(
+        Guid productId, DateOnly fromDate, CancellationToken cancellationToken) =>
+        await _context.StockMovements
+            .AsNoTracking()
+            .Where(m => m.ProductId == productId && m.MovementDate < fromDate)
+            .SumAsync(m => (decimal?)m.Quantity, cancellationToken) ?? 0m;
+
     public async Task<IReadOnlyList<StockMovement>> GetMovementsAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
-        // Movements are stamped with an instant, not a date, so the range is converted once here.
-        // The end is exclusive of the following midnight rather than inclusive of 23:59:59, which
-        // would silently drop anything in the last second of the day.
-        var fromUtc = new DateTimeOffset(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-        var toUtc = new DateTimeOffset(toDate.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-
+        // On the document's date, not on when the row was written — so this register and the sales
+        // register agree about the week the shelf emptied. MovementDate is already a shop day, so
+        // there is no timezone arithmetic left to get wrong.
         return await _context.StockMovements
             .AsNoTracking()
-            .Where(m => m.MovedAt >= fromUtc && m.MovedAt < toUtc)
-            .OrderBy(m => m.MovedAt)
+            .Where(m => m.MovementDate >= fromDate && m.MovementDate <= toDate)
+            .OrderBy(m => m.MovementDate)
+            .ThenBy(m => m.MovedAt)
             .ToListAsync(cancellationToken);
     }
 }

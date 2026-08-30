@@ -56,6 +56,12 @@ public class ShopSettingsService : IShopSettingsService
 
         var settings = await _repository.GetAsync(cancellationToken);
 
+        // Captured before the row is written over, so the log can say what it changed from.
+        var previousGstin = settings.Gstin;
+        var previousStateCode = settings.StateCode;
+        var previousName = settings.Name;
+        var previousTemplate = settings.InvoiceTemplate.ToString();
+
         settings.Name = request.Name.Trim();
         settings.LegalName = Clean(request.LegalName);
         settings.Gstin = Clean(request.Gstin)?.ToUpperInvariant();
@@ -71,7 +77,34 @@ public class ShopSettingsService : IShopSettingsService
         settings.BankDetails = Clean(request.BankDetails);
         settings.InvoiceTerms = Clean(request.InvoiceTerms);
         settings.InvoiceTemplate = template;
+        settings.BooksStartFrom = request.BooksStartFrom;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // Only the fields that change what a bill legally says. An address correction is not worth a
+        // log line; the GSTIN and the state are, because every invoice carries them and the return
+        // is filed under them — and a change to either was previously invisible.
+        var changes = new List<string>();
+
+        void Note(string field, string? before, string? after)
+        {
+            if (!string.Equals(before ?? string.Empty, after ?? string.Empty, StringComparison.Ordinal))
+            {
+                changes.Add($"{field} {(string.IsNullOrWhiteSpace(before) ? "unset" : before)} to "
+                    + $"{(string.IsNullOrWhiteSpace(after) ? "unset" : after)}");
+            }
+        }
+
+        Note("GSTIN", previousGstin, settings.Gstin);
+        Note("state", previousStateCode, settings.StateCode);
+        Note("name", previousName, settings.Name);
+        Note("template", previousTemplate, settings.InvoiceTemplate.ToString());
+
+        if (changes.Count > 0)
+        {
+            await _audit.RecordAsync(
+                AuditAction.SettingsChanged, "ShopSettings", entityId: null, entityLabel: settings.Name,
+                string.Join("; ", changes), cancellationToken);
+        }
 
         await _repository.SaveChangesAsync(cancellationToken);
 

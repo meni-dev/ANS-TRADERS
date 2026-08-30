@@ -1,3 +1,7 @@
+import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined'
+import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined'
+import SavingsOutlinedIcon from '@mui/icons-material/SavingsOutlined'
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
 import { StatTile } from '@/components/data/StatTile'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -45,7 +49,7 @@ export function ProfitAndLossPage() {
 
   return (
     <Stack spacing={2.5}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'flex-end' } }}>
         <Box sx={{ flex: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Profit &amp; Loss
@@ -60,7 +64,6 @@ export function ProfitAndLossPage() {
           label="From"
           value={fromDate}
           onChange={(e) => setFromDate(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
         />
         <TextField
           size="small"
@@ -68,7 +71,6 @@ export function ProfitAndLossPage() {
           label="To"
           value={toDate}
           onChange={(e) => setToDate(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
         />
         {can('ExpenseRecord') && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setRecordOpen(true)}>
@@ -84,10 +86,28 @@ export function ProfitAndLossPage() {
           gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' },
         }}
       >
-        <StatTile label="Revenue" value={formatCurrency(data?.revenue ?? 0)} caption="Taxable value, GST excluded" loading={isLoading} />
-        <StatTile label="Cost of goods" value={formatCurrency(data?.costOfGoods ?? 0)} loading={isLoading} />
+        <StatTile
+          label="Revenue"
+          value={formatCurrency(data?.revenue ?? 0)}
+          caption="Taxable value, GST excluded"
+          loading={isLoading}
+          icon={<TrendingUpOutlinedIcon />}
+          iconTone="blue"
+          tinted
+        />
+        <StatTile
+          label="Cost of goods"
+          value={formatCurrency(data?.costOfGoods ?? 0)}
+          loading={isLoading}
+          icon={<Inventory2OutlinedIcon />}
+          iconTone="violet"
+          tinted
+        />
         <StatTile
           label="Gross profit"
+          icon={<ShowChartOutlinedIcon />}
+          iconTone="teal"
+          tinted
           value={formatCurrency(data?.grossProfit ?? 0)}
           caption={
             data && !data.isComplete
@@ -99,6 +119,9 @@ export function ProfitAndLossPage() {
         />
         <StatTile
           label="Net profit"
+          icon={<SavingsOutlinedIcon />}
+          iconTone="amber"
+          tinted
           value={formatCurrency(data?.netProfit ?? 0)}
           tone={data && data.netProfit < 0 ? 'error' : 'success'}
           loading={isLoading}

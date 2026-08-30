@@ -1,9 +1,9 @@
+import { describeError } from '@/lib/api/errors'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import { Alert, Button, Chip, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { useAuth } from '@/features/auth/AuthProvider'
-import { ApiError } from '@/lib/api/client'
 import { formatDate, todayIso } from '@/lib/format'
 import { useSetBooksLock } from '../hooks'
 import type { ShopSettingsDto } from '../types'
@@ -32,11 +32,7 @@ export function BooksLockCard({ settings }: { settings: ShopSettingsDto }) {
       setDate(value ?? '')
       notify(value ? `Books locked up to ${formatDate(value)}` : 'Books unlocked')
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? Object.values(caught.errors)[0]?.[0] ?? caught.message
-          : 'Could not reach the server',
-      )
+      setError(describeError(caught, 'Could not reach the server'))
     }
   }
 
@@ -71,14 +67,14 @@ export function BooksLockCard({ settings }: { settings: ShopSettingsDto }) {
             Your role does not let you move this.
           </Typography>
         ) : (
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: 'center' }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: 'flex-end' }}>
             <TextField
               size="small"
               type="date"
               label="Locked up to"
               value={date}
               onChange={(event) => setDate(event.target.value)}
-              slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayIso() } }}
+              slotProps={{ htmlInput: { max: todayIso() } }}
             />
             <Button
               variant="contained"

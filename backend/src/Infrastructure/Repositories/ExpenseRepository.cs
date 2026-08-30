@@ -56,13 +56,6 @@ public class ExpenseRepository : IExpenseRepository
         return (items, totalCount);
     }
 
-    public async Task<int> GetLastSequenceAsync(
-        string financialYear, CancellationToken cancellationToken) =>
-        await _context.Expenses
-            .Where(e => e.FinancialYear == financialYear)
-            .Select(e => (int?)e.Sequence)
-            .MaxAsync(cancellationToken) ?? 0;
-
     public async Task<IReadOnlyList<(ExpenseCategory Category, decimal Amount, int Count)>>
         GetTotalsByCategoryAsync(DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {

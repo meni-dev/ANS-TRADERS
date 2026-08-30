@@ -1,11 +1,12 @@
 using Application.DTOs.Payments;
+using Application.Interfaces;
 using FluentValidation;
 
 namespace Application.Validators.Payments;
 
 public class CreatePaymentRequestValidator : AbstractValidator<CreatePaymentRequest>
 {
-    public CreatePaymentRequestValidator()
+    public CreatePaymentRequestValidator(IShopClock clock)
     {
         RuleFor(x => x.Direction).NotEmpty().WithMessage("Say whether money came in or went out");
 
@@ -13,7 +14,7 @@ public class CreatePaymentRequestValidator : AbstractValidator<CreatePaymentRequ
 
         RuleFor(x => x.Mode).NotEmpty().WithMessage("Pick how it was paid");
 
-        RuleFor(x => x.PaymentDate).DocumentDate();
+        RuleFor(x => x.PaymentDate).DocumentDate(clock);
 
         RuleFor(x => x.ReferenceNumber).MaximumLength(60);
         RuleFor(x => x.Notes).MaximumLength(500);

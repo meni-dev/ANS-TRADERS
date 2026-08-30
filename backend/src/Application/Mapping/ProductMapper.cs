@@ -19,6 +19,7 @@ public static class ProductMapper
         product.VehicleModel,
         product.Hsn,
         product.GstRate,
+        product.SupplyType.ToString(),
         product.CgstRate,
         product.SgstRate,
         product.Uqc,

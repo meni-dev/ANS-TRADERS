@@ -1,3 +1,5 @@
+import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
 import {
   Box,
@@ -203,10 +205,23 @@ export function RegistersPage() {
 
   return (
     <Stack spacing={2}>
+      <PageHeader
+        title="Reports & GST"
+        icon={<AssessmentOutlinedIcon />}
+        iconTone="rose"
+        caption={
+          // Counted, not written down. The last hard-coded number went stale the day a register
+          // was added and told the shop it had one fewer than it did.
+          summaries.length > 0
+            ? `${summaries.length} registers, each one downloadable as a spreadsheet for the accountant.`
+            : 'Every register, downloadable as a spreadsheet for the accountant.'
+        }
+        flush
+      />
       <Stack
         direction={{ xs: 'column', md: 'row' }}
         spacing={2}
-        sx={{ alignItems: { md: 'center' } }}
+        sx={{ alignItems: { md: 'flex-end' } }}
       >
         <TextField
           select
@@ -226,13 +241,27 @@ export function RegistersPage() {
           ])}
         </TextField>
 
-        {/* Stock has one current level and a party has one current balance, so a date range would
-            be a control that changes nothing. Better to take it away than to leave it there
-            answering the same figures whatever it is set to. */}
+        {/* A position register answers for one day, not a stretch of them, so it gets one date
+            rather than a range. It used to get no control at all and always answer for today —
+            which made the two questions an accountant opens with, what was on the shelf at the year
+            end and who owed what, impossible to ask. */}
         {asAt ? (
-          <Typography variant="body2" color="text.secondary">
-            As at {formatDate(today)}
-          </Typography>
+          <>
+            <TextField
+              size="small"
+              type="date"
+              label="As at"
+              value={range.toDate}
+              onChange={(event) => setRange({ ...range, toDate: event.target.value })}
+              slotProps={{ htmlInput: { max: today } }}
+            />
+            <Button size="small" onClick={() => setRange({ ...range, toDate: today })}>
+              Today
+            </Button>
+            <Button size="small" onClick={() => setRange({ ...range, toDate: financialYear(today).fromDate })}>
+              Year start
+            </Button>
+          </>
         ) : (
           <>
             <TextField
@@ -241,7 +270,6 @@ export function RegistersPage() {
               label="From"
               value={range.fromDate}
               onChange={(event) => setRange({ ...range, fromDate: event.target.value })}
-              slotProps={{ inputLabel: { shrink: true } }}
             />
             <TextField
               size="small"
@@ -249,7 +277,6 @@ export function RegistersPage() {
               label="To"
               value={range.toDate}
               onChange={(event) => setRange({ ...range, toDate: event.target.value })}
-              slotProps={{ inputLabel: { shrink: true } }}
             />
 
             <Button size="small" onClick={() => setRange(thisMonth(today))}>

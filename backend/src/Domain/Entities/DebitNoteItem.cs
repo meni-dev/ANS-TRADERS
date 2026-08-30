@@ -30,6 +30,8 @@ public class DebitNoteItem : Entity
     public decimal GrossAmount { get; set; }
     public decimal TaxableAmount { get; set; }
     public decimal GstRate { get; set; }
+
+
     public decimal CgstAmount { get; set; }
     public decimal SgstAmount { get; set; }
     public decimal IgstAmount { get; set; }

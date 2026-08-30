@@ -1,3 +1,5 @@
+import QueryStatsOutlinedIcon from '@mui/icons-material/QueryStatsOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
 import {
   Alert,
@@ -74,6 +76,13 @@ function DeadStockTab() {
 
   return (
     <Stack spacing={2}>
+      <PageHeader
+        title="Shelf Insights"
+        icon={<QueryStatsOutlinedIcon />}
+        iconTone="teal"
+        caption="Money standing still, margins drifting, and what to buy next."
+        flush
+      />
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 4 }}>
           <StatTile

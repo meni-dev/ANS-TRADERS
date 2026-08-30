@@ -19,5 +19,11 @@ public interface IAuditLog
         Guid? entityId,
         string? entityLabel,
         string? detail,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        /// <summary>
+        /// Who did it, when the request has no session behind it yet. Signing in is the only such
+        /// case: the person is known, but they are not signed in until the row is written. Left
+        /// null everywhere else, where the session already says who is asking.
+        /// </summary>
+        string? actedBy = null);
 }

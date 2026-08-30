@@ -7,6 +7,15 @@ public interface IStockRepository
 {
     Task AddMovementAsync(StockMovement movement, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// What the shelf held at the end of <paramref name="onDate"/>, from the movements themselves.
+    /// <para>
+    /// <see cref="Domain.Entities.Product.StockOnHand"/> answers for today and nothing else, so a
+    /// back-dated document has to be checked against the day it claims to have happened on.
+    /// </para>
+    /// </summary>
+    Task<decimal> GetBalanceOnAsync(Guid productId, DateOnly onDate, CancellationToken cancellationToken);
+
     Task<(IReadOnlyList<Product> Items, int TotalCount)> SearchStockAsync(
         string? search, bool? lowOnly, bool? activeOnly, int page, int pageSize, CancellationToken cancellationToken);
 

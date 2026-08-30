@@ -1,9 +1,9 @@
+import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFSwitch } from '@/components/form/RHFSwitch'
-import { ApiError } from '@/lib/api/client'
 import { zodResolver } from '@hookform/resolvers/zod'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Grid, TextField, Typography } from '@mui/material'
@@ -27,6 +27,7 @@ function toFormValues(product: ProductDto): EditProductFormValues {
     uqc: product.uqc,
     // Editing the catalogue implies permission to see the rate, so it is present here. The
     // fallback is only so the form has a number to start from if it ever is not.
+    supplyType: product.supplyType,
     purchaseRate: product.purchaseRate ?? 0,
     sellingRate: product.sellingRate,
     mrp: product.mrp,
@@ -67,11 +68,7 @@ export function EditProductDialog({ product, onClose }: EditProductDialogProps) 
       notify(`Product "${values.itemName}" updated`)
       onClose()
     } catch (error) {
-      if (error instanceof ApiError) {
-        setServerError(error.message)
-      } else {
-        setServerError('Something went wrong. Please try again.')
-      }
+      setServerError(describeError(error, 'Something went wrong. Please try again.'))
     }
   })
 

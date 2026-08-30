@@ -12,6 +12,10 @@ public class CreateCustomerRequestValidator : AbstractValidator<CreateCustomerRe
         RuleFor(x => x.Email).PartyEmail().MaximumLength(200);
         RuleFor(x => x.Gstin).PartyGstin();
 
+        RuleFor(x => x.Gstin)
+            .Must((req, gstin) => GstRules.StateMatches(gstin, req.StateCode))
+            .WithMessage("The GSTIN starts with a different state code than the state chosen");
+
         RuleFor(x => x.AddressLine1).MaximumLength(200);
         RuleFor(x => x.AddressLine2).MaximumLength(200);
         RuleFor(x => x.City).MaximumLength(100);

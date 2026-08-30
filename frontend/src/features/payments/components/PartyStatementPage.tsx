@@ -1,13 +1,13 @@
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { PrintStyles } from '@/features/billing/templates/PrintStyles'
 import { useShopSettings } from '@/features/settings/hooks'
 import { formatCurrency, formatDate } from '@/lib/format'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined'
 import {
   Box,
   Button,
   Divider,
-  IconButton,
   Paper,
   Stack,
   Table,
@@ -52,38 +52,37 @@ export function PartyStatementPage() {
     <Stack spacing={2.5}>
       <PrintStyles page="A4" />
 
-      <Stack direction="row" spacing={1.5} className="no-print" sx={{ alignItems: 'center' }}>
-        <IconButton onClick={() => navigate(-1)} aria-label="Back">
-          <ArrowBackIcon />
-        </IconButton>
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Statement of account
-          </Typography>
-          <Typography sx={{ fontSize: 13.5, color: 'text.secondary' }}>
-            {data?.partyName ?? '—'}
-          </Typography>
-        </Box>
-        <TextField
-          size="small"
-          type="date"
-          label="From"
-          value={fromDate}
-          onChange={(event) => setFromDate(event.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <TextField
-          size="small"
-          type="date"
-          label="To"
-          value={toDate}
-          onChange={(event) => setToDate(event.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <Button variant="contained" startIcon={<PrintOutlinedIcon />} onClick={() => window.print()}>
-          Print
-        </Button>
-      </Stack>
+      <PageHeader
+        title="Statement of account"
+        icon={<ReceiptLongOutlinedIcon />}
+        iconTone="blue"
+        caption={data?.partyName ?? '—'}
+        onBack={() => navigate(-1)}
+        align="flex-end"
+        className="no-print"
+        actions={
+          <>
+            <TextField
+              size="small"
+              type="date"
+              label="From"
+              value={fromDate}
+              onChange={(event) => setFromDate(event.target.value)}
+            />
+            <TextField
+              size="small"
+              type="date"
+              label="To"
+              value={toDate}
+              onChange={(event) => setToDate(event.target.value)}
+            />
+            <Button variant="contained" startIcon={<PrintOutlinedIcon />} onClick={() => window.print()}>
+              Print
+            </Button>
+          </>
+        }
+        flush
+      />
 
       <Paper variant="outlined" className="print-sheet" sx={{ p: { xs: 2, sm: 4 } }}>
         <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between', mb: 2 }}>

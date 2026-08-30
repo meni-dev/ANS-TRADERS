@@ -1,3 +1,5 @@
+import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable } from '@/components/data/DataTable'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog'
@@ -235,43 +237,38 @@ export function ProductListPage() {
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-start' }, mb: 2.5 }}
-      >
-        <Box>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-            <Typography variant="h1">Products</Typography>
-            {!isLoading && (
-              <Chip
-                label={`${total} ${total === 1 ? 'item' : 'items'}`}
-                size="small"
-                sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}
-              />
-            )}
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Every spare part you stock — search by part number, item name or vehicle.
-          </Typography>
-        </Box>
-
-        {can('ProductManage') && (
-          <Stack direction="row" spacing={1}>
-            {/* A catalogue is thousands of parts — typing them in one at a time is not a plan. */}
-            <Button
-              variant="outlined"
-              startIcon={<UploadFileOutlinedIcon />}
-              onClick={() => navigate('/products/import')}
-            >
-              Import
-            </Button>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
-              Add Product
-            </Button>
-          </Stack>
-        )}
-      </Stack>
+      <PageHeader
+        title="Products"
+        icon={<CategoryOutlinedIcon />}
+        iconTone="teal"
+        caption="Every spare part you stock — search by part number, item name or vehicle."
+        badge={
+          !isLoading && (
+            <Chip
+              label={`${total} ${total === 1 ? 'item' : 'items'}`}
+              size="small"
+              sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}
+            />
+          )
+        }
+        actions={
+          can('ProductManage') && (
+            <Stack direction="row" spacing={1}>
+              {/* A catalogue is thousands of parts — typing them in one at a time is not a plan. */}
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileOutlinedIcon />}
+                onClick={() => navigate('/products/import')}
+              >
+                Import
+              </Button>
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
+                Add Product
+              </Button>
+            </Stack>
+          )
+        }
+      />
 
       <TextField
         placeholder="Search part number, item name, vehicle…"

@@ -29,6 +29,10 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Uqc).IsRequired().HasMaxLength(20);
 
         builder.Property(p => p.GstRate).HasColumnType("numeric(5,2)");
+
+        // By name, not by number — the same rule the statuses follow. Inserting a member into the
+        // enum later must not silently reclassify goods that were sold as something else.
+        builder.Property(p => p.SupplyType).HasConversion<string>().HasMaxLength(20);
         builder.Property(p => p.CgstRate).HasColumnType("numeric(5,2)");
         builder.Property(p => p.SgstRate).HasColumnType("numeric(5,2)");
         builder.Property(p => p.PurchaseRate).HasColumnType("numeric(18,2)");

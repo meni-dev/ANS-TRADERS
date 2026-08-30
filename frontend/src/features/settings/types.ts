@@ -21,6 +21,8 @@ export type ShopSettingsDto = {
   invoiceTemplate: InvoiceTemplateId
   /** `null` means the books are open. Everything on or before this date refuses to change. */
   booksLockedUpTo: string | null
+  /** The day the shop's books begin. Nothing may be dated before it. */
+  booksStartFrom: string | null
 }
 
 // Patterns mirror the server-side rules in PartyRules.cs, so the shop's own details are held to
@@ -31,6 +33,7 @@ const PINCODE_PATTERN = /^[0-9]{6}$/
 const optional = (schema: z.ZodString) => schema.optional().or(z.literal(''))
 
 export const shopSettingsSchema = z.object({
+  booksStartFrom: z.string().nullable().optional(),
   name: z.string().min(1, 'The shop name is printed on every bill').max(200),
   legalName: optional(z.string().max(200)),
   gstin: optional(z.string().regex(GSTIN_PATTERN, 'Enter a valid 15-character GSTIN')),

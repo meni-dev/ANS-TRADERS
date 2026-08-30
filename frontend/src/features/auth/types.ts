@@ -18,6 +18,7 @@ export type Permission =
   | 'PaymentCancel'
   | 'ExpenseRecord'
   | 'CashDayClose'
+  | 'CapitalMovement'
   | 'CostView'
   | 'ReportView'
   | 'UserManage'

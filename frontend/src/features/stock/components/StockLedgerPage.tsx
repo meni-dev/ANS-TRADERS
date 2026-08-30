@@ -1,3 +1,5 @@
+import SwapVertOutlinedIcon from '@mui/icons-material/SwapVertOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable } from '@/components/data/DataTable'
 import { formatDate, formatQuantity } from '@/lib/format'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
@@ -63,11 +65,11 @@ export function StockLedgerPage() {
   const columns: GridColDef<StockMovementDto>[] = useMemo(
     () => [
       {
-        field: 'movedAt',
+        field: 'movementDate',
         headerName: 'Date',
         width: 120,
         renderCell: (params) => (
-          <Typography sx={{ fontSize: 13 }}>{formatDate(params.row.movedAt)}</Typography>
+          <Typography sx={{ fontSize: 13 }}>{formatDate(params.row.movementDate)}</Typography>
         ),
       },
       {
@@ -173,31 +175,26 @@ export function StockLedgerPage() {
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-start' }, mb: 2.5 }}
-      >
-        <Box>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-            <Typography variant="h1">Stock Ledger</Typography>
-            {!isLoading && (
-              <Chip
-                label={`${total} ${total === 1 ? 'movement' : 'movements'}`}
-                size="small"
-                sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}
-              />
-            )}
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Every quantity change, with the document behind it. Newest first.
-          </Typography>
-        </Box>
-
-        <Button variant="outlined" onClick={() => navigate('/inventory/stock')}>
-          Back to Stock
-        </Button>
-      </Stack>
+      <PageHeader
+        title="Stock Ledger"
+        icon={<SwapVertOutlinedIcon />}
+        iconTone="violet"
+        caption="Every quantity change, with the document behind it. Newest first."
+        badge={
+          !isLoading && (
+            <Chip
+              label={`${total} ${total === 1 ? 'movement' : 'movements'}`}
+              size="small"
+              sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}
+            />
+          )
+        }
+        actions={
+          <Button variant="outlined" onClick={() => navigate('/inventory/stock')}>
+            Back to Stock
+          </Button>
+        }
+      />
 
       {productId && (
         <Chip

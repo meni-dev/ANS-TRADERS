@@ -1,3 +1,6 @@
+import { describeError } from '@/lib/api/errors'
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import {
@@ -16,7 +19,6 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog'
 import { useNotification } from '@/components/feedback/NotificationProvider'
-import { ApiError } from '@/lib/api/client'
 import { useAuth } from '../AuthProvider'
 import {
   useCreateRole,
@@ -27,12 +29,8 @@ import {
 } from '../hooks'
 import type { Permission, PermissionInfo, Role } from '../types'
 
-function message(caught: unknown, fallback: string) {
-  if (caught instanceof ApiError) {
-    return Object.values(caught.errors)[0]?.[0] ?? caught.message
-  }
-  return fallback
-}
+/** One sentence for the counter, whichever shape the failure came back in. */
+const message = describeError
 
 /** A blank role to start from — nothing ticked, so every grant is a decision somebody made. */
 const BLANK = { id: '', name: '', description: '', permissions: [] as Permission[] }
@@ -196,11 +194,13 @@ export function RolesPage() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        A role is a set of things somebody is allowed to do. The list of permissions is fixed — each
-        one exists because the app refuses the action without it — but the roles you build out of
-        them are yours.
-      </Typography>
+      <PageHeader
+        title="Roles"
+        icon={<BadgeOutlinedIcon />}
+        iconTone="violet"
+        caption="A role is a set of things somebody is allowed to do. The list of permissions is fixed — each one exists because the app refuses the action without it — but the roles you build out of them are yours."
+        flush
+      />
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: 'flex-start' }}>
         <Paper sx={{ width: { xs: '100%', md: 260 }, flexShrink: 0, p: 1 }}>

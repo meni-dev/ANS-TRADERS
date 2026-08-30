@@ -77,6 +77,10 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<MoneyMovement> MoneyMovements => Set<MoneyMovement>();
+
+    public DbSet<DocumentCounter> DocumentCounters => Set<DocumentCounter>();
+
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();

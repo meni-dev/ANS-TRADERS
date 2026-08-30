@@ -10,6 +10,21 @@ namespace UnitTests;
 /// implemented; the rest throw, so a test that starts depending on one fails loudly rather than
 /// quietly passing against a stub that returns nothing.
 /// </summary>
+/// <summary>
+/// Counts up per series, the way the real one does, without needing a database to do it.
+/// </summary>
+internal sealed class CountingNumbers : IDocumentNumbers
+{
+    private readonly Dictionary<(DocumentKind, string), int> _last = [];
+
+    public Task<int> NextAsync(DocumentKind kind, string financialYear, CancellationToken cancellationToken)
+    {
+        var key = (kind, financialYear);
+        _last[key] = _last.GetValueOrDefault(key) + 1;
+        return Task.FromResult(_last[key]);
+    }
+}
+
 internal sealed class FakePaymentRepository : IPaymentRepository
 {
     public List<Invoice> OpenInvoices { get; } = [];
@@ -37,9 +52,6 @@ internal sealed class FakePaymentRepository : IPaymentRepository
 
     public void AddAllocation(PaymentAllocation allocation) => StagedAllocations.Add(allocation);
 
-    public Task<int> GetLastSequenceAsync(
-        PaymentDirection direction, string financialYear, CancellationToken cancellationToken) =>
-        Task.FromResult(0);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -84,7 +96,7 @@ public class PaymentLedgerTests
     {
         var payments = new FakePaymentRepository();
         var entries = new FakePartyLedgerRepository();
-        return (new PaymentLedger(payments, new PartyLedger(entries)), payments, entries);
+        return (new PaymentLedger(payments, new PartyLedger(entries), new CountingNumbers()), payments, entries);
     }
 
     private static Customer ACustomer() => new() { Name = "Kumar Motors", Phone = "9791122334" };

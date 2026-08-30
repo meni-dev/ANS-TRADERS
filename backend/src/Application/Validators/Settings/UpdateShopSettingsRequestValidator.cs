@@ -16,6 +16,10 @@ public class UpdateShopSettingsRequestValidator : AbstractValidator<UpdateShopSe
         // Reuses the party rules, so the shop's own GSTIN is held to exactly the standard its
         // customers and suppliers are.
         RuleFor(x => x.Gstin).PartyGstin();
+
+        RuleFor(x => x.Gstin)
+            .Must((req, gstin) => GstRules.StateMatches(gstin, req.StateCode))
+            .WithMessage("The GSTIN starts with a different state code than the state chosen");
         RuleFor(x => x.Email).PartyEmail();
         RuleFor(x => x.Pincode).PartyPincode();
 

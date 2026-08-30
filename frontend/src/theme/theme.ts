@@ -53,9 +53,34 @@ const shadow = {
   lg: '0 8px 24px -6px rgba(24, 29, 36, 0.12), 0 16px 48px -12px rgba(24, 29, 36, 0.14)',
 }
 
+/**
+ * Tint / solid pairs for the icon chips that head a stat tile or a dashboard module.
+ * <p>
+ * Five hues, all pulled towards the brand blue so a row of them reads as one family rather than as
+ * a paint chart. They label a card; they never encode a value — a figure's own colour still comes
+ * from the palette's semantic tones, so nothing on screen means "good" because it happens to be
+ * teal.
+ * </p>
+ */
+export const accent = {
+  neutral: { tint: '#F1F3F7', solid: '#5A6473' },
+  blue: { tint: '#EAF0FF', solid: '#2F63E8' },
+  violet: { tint: '#F1EEFC', solid: '#5B45B8' },
+  teal: { tint: '#E2F6F2', solid: '#00806D' },
+  amber: { tint: '#FDF3E4', solid: '#B87A21' },
+  rose: { tint: '#FCF0F1', solid: '#A8535A' },
+} as const
+
+export type AccentTone = keyof typeof accent
+
 export const layout = {
-  drawerWidth: 264,
-  appBarHeight: 64,
+  /** The sidebar with labels showing. */
+  drawerWidth: 248,
+  /** Collapsed: icons only, labels in a flyout. Wide enough for a 32px hit target plus air. */
+  railWidth: 60,
+  appBarHeight: 52,
+  /** Both the drawer and the shifted main column animate on this, so they must agree. */
+  sidebarTransition: 'width 180ms cubic-bezier(0.4, 0, 0.2, 1)',
 }
 
 export const theme = createTheme({
@@ -276,16 +301,50 @@ export const theme = createTheme({
         input: {
           '&::placeholder': { color: neutral[400], opacity: 1 },
         },
+        // Labels sit above the box rather than floating into the border, so the outline is a plain
+        // rectangle. MUI insets the fieldset by -5px to make room for a floating label; with the
+        // label gone from there, that inset would lift the outline off the input.
+        notchedOutline: {
+          top: 0,
+          '& legend': { display: 'none' },
+        },
       },
     },
 
+    /**
+     * The label is a caption above the field, not a word floating in the border. MUI's outlined
+     * label rides on the outline and its shrink offset is calibrated for a 16px label; at the 14px
+     * this theme uses, the border line crossed the tops of the letters on every field in the app.
+     *
+     * Taking the label out of the border removes the whole class of problem: nothing has to line up
+     * with anything, the label is readable while the field is being typed into, and the outline
+     * stays an unbroken rectangle. `shrink` is forced on because there is no longer a resting
+     * position inside the box for a label to float up from.
+     */
     MuiInputLabel: {
+      defaultProps: { shrink: true },
       styleOverrides: {
         root: {
-          fontSize: '0.875rem',
-          color: neutral[500],
-          '&.Mui-focused': { color: brand[600] },
+          // Both selectors are needed: MUI re-applies the shrink transform from its own variant,
+          // and only a two-class selector outranks it.
+          '&.MuiInputLabel-outlined, &.MuiInputLabel-outlined.MuiInputLabel-shrink': {
+            position: 'static',
+            transform: 'none',
+            transition: 'none',
+            maxWidth: '100%',
+            marginBottom: 4,
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            lineHeight: 1.4,
+            color: neutral[600],
+            // Focus is already announced by the border and the ring around the box. A caption that
+            // changes colour as well is noise on a form with a dozen fields.
+            '&.Mui-focused': { color: neutral[600] },
+            '&.Mui-error': { color: danger.text },
+            '&.Mui-disabled': { color: neutral[400] },
+          },
         },
+        asterisk: { color: danger.main },
       },
     },
 
@@ -377,24 +436,52 @@ export const theme = createTheme({
       },
     },
 
+    /**
+     * Four states, one family.
+     *
+     * The selectors matter more than they look: MUI 9 emits `MuiAlert-standard` plus
+     * `MuiAlert-colorError`, and there is no `MuiAlert-standardError` class at all. This block used
+     * to target the old name, so every alert in the app rendered as plain white with grey text —
+     * the whole palette below had never once been seen.
+     */
     MuiAlert: {
       styleOverrides: {
         root: {
           borderRadius: 8,
           fontSize: '0.8125rem',
-          // A hairline border carries the boundary so the fill can stay near-white. The old
-          // solid pink block shouted louder than the message inside it.
-          '&.MuiAlert-standardError': {
+          // A message long enough to wrap should read as one block, so the icon sits with the
+          // first line rather than floating in the middle of two.
+          alignItems: 'flex-start',
+          paddingBlock: 8,
+          '& .MuiAlert-icon': { paddingBlock: 1, marginRight: 10 },
+          '& .MuiAlert-message': { paddingBlock: 0, lineHeight: 1.55 },
+          '& .MuiAlertTitle-root': { fontSize: '0.8125rem', marginBottom: 2 },
+
+          // A hairline border carries the boundary so the fill can stay near-white. The old solid
+          // pink block shouted louder than the message inside it.
+          '&.MuiAlert-standard.MuiAlert-colorError': {
             backgroundColor: danger.surface,
             color: danger.text,
             border: `1px solid ${danger.border}`,
             '& .MuiAlert-icon': { color: danger.icon },
           },
-          '&.MuiAlert-standardSuccess': {
+          '&.MuiAlert-standard.MuiAlert-colorSuccess': {
             backgroundColor: '#F4FAF8',
             color: '#3F7168',
             border: '1px solid #D8EAE5',
             '& .MuiAlert-icon': { color: '#6BA396' },
+          },
+          '&.MuiAlert-standard.MuiAlert-colorWarning': {
+            backgroundColor: '#FFFCF5',
+            color: '#8A6220',
+            border: '1px solid #F5E3C2',
+            '& .MuiAlert-icon': { color: '#D09A3C' },
+          },
+          '&.MuiAlert-standard.MuiAlert-colorInfo': {
+            backgroundColor: brand[50],
+            color: brand[800],
+            border: `1px solid ${brand[100]}`,
+            '& .MuiAlert-icon': { color: brand[500] },
           },
         },
       },

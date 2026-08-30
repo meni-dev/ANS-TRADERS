@@ -11,10 +11,13 @@ public class PaymentLedger : IPaymentLedger
     private readonly IPaymentRepository _repository;
     private readonly IPartyLedger _partyLedger;
 
-    public PaymentLedger(IPaymentRepository repository, IPartyLedger partyLedger)
+    private readonly IDocumentNumbers _numbers;
+
+    public PaymentLedger(IPaymentRepository repository, IPartyLedger partyLedger, IDocumentNumbers numbers)
     {
         _repository = repository;
         _partyLedger = partyLedger;
+        _numbers = numbers;
     }
 
     public Task<Payment> ReceiveAsync(PaymentDraft draft, CancellationToken cancellationToken) =>
@@ -55,8 +58,10 @@ public class PaymentLedger : IPaymentLedger
             // Counter payments deliberately skip this: the invoice the customer is handed already
             // serves as their receipt, and a second number for one event is what later produces two
             // documents for one transaction.
-            var sequence = await _repository.GetLastSequenceAsync(
-                draft.Direction, payment.FinancialYear, cancellationToken) + 1;
+            var sequence = await _numbers.NextAsync(
+                draft.Direction == PaymentDirection.Received ? DocumentKind.Receipt : DocumentKind.PaymentOut,
+                payment.FinancialYear,
+                cancellationToken);
 
             payment.Sequence = sequence;
             payment.ReceiptNumber = FormatNumber(draft.Direction, payment.FinancialYear, sequence);

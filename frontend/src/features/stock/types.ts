@@ -33,6 +33,9 @@ export type StockMovementDto = {
   /** Signed: positive brought stock in, negative took it out. */
   quantity: number
   balanceAfter: number
+  /** The day the goods moved, taken from the document that moved them. */
+  movementDate: string
+  /** When the row was written. Audit only — the screen shows movementDate. */
   movedAt: string
   referenceId?: string | null
   referenceNumber?: string | null

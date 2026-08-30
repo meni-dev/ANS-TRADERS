@@ -1,10 +1,10 @@
+import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
 import { RHFTextField } from '@/components/form/RHFTextField'
-import { ApiError } from '@/lib/api/client'
 import { formatQuantity } from '@/lib/format'
 import { zodResolver } from '@hookform/resolvers/zod'
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined'
@@ -66,9 +66,7 @@ export function AdjustStockDialog({ product, onClose }: AdjustStockDialogProps) 
       notify(`Stock for "${product.itemName}" corrected to ${formatQuantity(values.countedQuantity)}`)
       onClose()
     } catch (error) {
-      setServerError(
-        error instanceof ApiError ? error.message : 'Something went wrong. Please try again.',
-      )
+      setServerError(describeError(error, 'Something went wrong. Please try again.'))
     }
   })
 

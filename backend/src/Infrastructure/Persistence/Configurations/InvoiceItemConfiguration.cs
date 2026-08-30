@@ -18,6 +18,10 @@ public class InvoiceItemConfiguration : IEntityTypeConfiguration<InvoiceItem>
         builder.Property(i => i.PartNumber).IsRequired().HasMaxLength(100);
         builder.Property(i => i.ItemName).IsRequired().HasMaxLength(200);
         builder.Property(i => i.Hsn).IsRequired().HasMaxLength(20);
+
+        // By name, not by number — the same rule the statuses follow. Inserting a member into the
+        // enum later must not silently reclassify goods already sold and already filed.
+        builder.Property(i => i.SupplyType).HasConversion<string>().HasMaxLength(20);
         builder.Property(i => i.Uqc).IsRequired().HasMaxLength(20);
 
         builder.Property(i => i.Quantity).HasColumnType("numeric(18,3)");

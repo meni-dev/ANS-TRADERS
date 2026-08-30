@@ -48,4 +48,12 @@ public class CurrentUser : ICurrentUser
             throw new ForbiddenException($"Your role does not let you {action}");
         }
     }
+
+    public void RequireAny(string action, params Permission[] permissions)
+    {
+        if (!permissions.Any(Has))
+        {
+            throw new ForbiddenException($"Your role does not let you {action}");
+        }
+    }
 }

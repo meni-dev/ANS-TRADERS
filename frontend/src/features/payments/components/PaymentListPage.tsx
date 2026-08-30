@@ -1,3 +1,7 @@
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
+import CallReceivedIcon from '@mui/icons-material/CallReceived'
+import CallMadeIcon from '@mui/icons-material/CallMade'
+import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined'
 import { DataTable } from '@/components/data/DataTable'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { StatTile } from '@/components/data/StatTile'
@@ -192,16 +196,43 @@ export function PaymentListPage() {
         )}
       </Stack>
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' } }}>
-        <StatTile label="Collected" value={formatCurrency(summary.data?.collected ?? 0)} />
-        <StatTile label="Paid out" value={formatCurrency(summary.data?.paidOut ?? 0)} />
-        <StatTile label="Net cash" value={formatCurrency(summary.data?.netCash ?? 0)} />
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 2,
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' },
+        }}
+      >
+        <StatTile
+          label="Collected"
+          value={formatCurrency(summary.data?.collected ?? 0)}
+          icon={<CallReceivedIcon />}
+          iconTone="teal"
+          tinted
+        />
+        <StatTile
+          label="Paid out"
+          value={formatCurrency(summary.data?.paidOut ?? 0)}
+          icon={<CallMadeIcon />}
+          iconTone="rose"
+          tinted
+        />
+        <StatTile
+          label="Net cash"
+          value={formatCurrency(summary.data?.netCash ?? 0)}
+          icon={<AccountBalanceOutlinedIcon />}
+          iconTone="blue"
+          tinted
+        />
+        {/* Deliberately its own tile: paper the shop is holding is not money it can spend, and
+            adding it to Collected is how a cash figure starts lying. */}
         <StatTile
           label="Cheques in hand"
           value={formatCurrency(summary.data?.chequesInHand ?? 0)}
-          // Deliberately its own tile: paper the shop is holding is not money it can spend, and
-          // adding it to Collected is how a cash figure starts lying.
           caption={`${summary.data?.chequesInHandCount ?? 0} not yet cleared`}
+          icon={<AccountBalanceWalletOutlinedIcon />}
+          iconTone="violet"
+          tinted
         />
       </Box>
 

@@ -1,7 +1,11 @@
+import { describeError } from '@/lib/api/errors'
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined'
+import CallReceivedIcon from '@mui/icons-material/CallReceived'
+import CallMadeIcon from '@mui/icons-material/CallMade'
 import { StatTile } from '@/components/data/StatTile'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useNotification } from '@/components/feedback/NotificationProvider'
-import { ApiError } from '@/lib/api/client'
 import { formatCurrency, formatDate, todayIso } from '@/lib/format'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import {
@@ -22,6 +26,7 @@ import {
 } from '@mui/material'
 import { useState } from 'react'
 import { useCashBook, useCashPosition, useCloseDay } from '../hooks'
+import { MoneyMovementsCard } from './MoneyMovementsCard'
 
 function monthStart(): string {
   const now = new Date()
@@ -68,17 +73,13 @@ export function CashPage() {
       setCounted('')
       setReason('')
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? (Object.values(caught.errors).flat()[0] ?? caught.message)
-          : 'Could not close the day',
-      )
+      setError(describeError(caught, 'Could not close the day'))
     }
   }
 
   return (
     <Stack spacing={2.5}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'flex-end' } }}>
         <Box sx={{ flex: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Cash &amp; Day Close
@@ -93,7 +94,6 @@ export function CashPage() {
           label="Day"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
         />
       </Stack>
 
@@ -113,10 +113,28 @@ export function CashPage() {
           gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' },
         }}
       >
-        <StatTile label="Opened with" value={formatCurrency(p?.openingCash ?? 0)} loading={position.isLoading} />
-        <StatTile label="Cash in" value={formatCurrency(p?.cashReceived ?? 0)} tone="success" loading={position.isLoading} />
+        <StatTile
+          label="Opened with"
+          value={formatCurrency(p?.openingCash ?? 0)}
+          loading={position.isLoading}
+          icon={<LoginOutlinedIcon />}
+          iconTone="blue"
+          tinted
+        />
+        <StatTile
+          label="Cash in"
+          value={formatCurrency(p?.cashReceived ?? 0)}
+          tone="success"
+          loading={position.isLoading}
+          icon={<CallReceivedIcon />}
+          iconTone="teal"
+          tinted
+        />
         <StatTile
           label="Cash out"
+          icon={<CallMadeIcon />}
+          iconTone="rose"
+          tinted
           value={formatCurrency((p?.cashPaidOut ?? 0) + (p?.cashExpenses ?? 0))}
           caption={p ? `${formatCurrency(p.cashExpenses)} of it expenses` : undefined}
           loading={position.isLoading}
@@ -126,6 +144,9 @@ export function CashPage() {
           value={formatCurrency(p?.expectedCash ?? 0)}
           tone="primary"
           loading={position.isLoading}
+          icon={<AccountBalanceWalletOutlinedIcon />}
+          iconTone="violet"
+          tinted
         />
       </Box>
 
@@ -161,7 +182,7 @@ export function CashPage() {
         ) : (
           <Stack spacing={2}>
             <Typography sx={{ fontWeight: 700 }}>Count the drawer</Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: 'flex-start' }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: 'flex-end' }}>
               <TextField
                 size="small"
                 type="number"
@@ -215,12 +236,14 @@ export function CashPage() {
         )}
       </Paper>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
+      <MoneyMovementsCard fromDate={fromDate} toDate={toDate} />
+
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'flex-end' } }}>
         <Typography sx={{ fontWeight: 700, flex: 1 }}>Cash book</Typography>
         <TextField size="small" type="date" label="From" value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          onChange={(e) => setFromDate(e.target.value)} />
         <TextField size="small" type="date" label="To" value={toDate}
-          onChange={(e) => setToDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          onChange={(e) => setToDate(e.target.value)} />
       </Stack>
 
       <Paper variant="outlined">

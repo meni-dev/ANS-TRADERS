@@ -125,6 +125,38 @@ export const navItems: NavItem[] = [
   },
 ]
 
+export type NavPage = {
+  label: string
+  path: string
+  /** The section it sits under. Empty for a top-level page, which is its own section. */
+  group: string
+  icon: ReactNode
+}
+
+/**
+ * Every reachable page as one flat list, for the command palette.
+ * <p>
+ * Feed it the already-filtered tree from {@link visibleNavItems} — the palette must not offer a
+ * page the drawer has hidden, or ⌘K becomes a way around the sidebar's permission filtering.
+ * </p>
+ */
+export function flattenNavPages(items: NavItem[]): NavPage[] {
+  const pages: NavPage[] = []
+
+  for (const item of items) {
+    if (item.path && !item.comingSoon && !item.hidden) {
+      pages.push({ label: item.label, path: item.path, group: '', icon: item.icon })
+    }
+    for (const child of item.children ?? []) {
+      if (child.path && !child.comingSoon && !child.hidden) {
+        pages.push({ label: child.label, path: child.path, group: item.label, icon: child.icon })
+      }
+    }
+  }
+
+  return pages
+}
+
 /**
  * True when a nav entry owns the current route. Sections like Billing have nested routes
  * (`/billing/new`, `/billing/:id`) that must still light up their parent row, so this matches on the

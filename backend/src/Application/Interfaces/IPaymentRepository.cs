@@ -35,8 +35,6 @@ public interface IPaymentRepository
     /// Highest sequence used in a financial year for one direction, or 0. Standalone receipts only —
     /// counter payments carry no number and must not consume the series.
     /// </summary>
-    Task<int> GetLastSequenceAsync(
-        PaymentDirection direction, string financialYear, CancellationToken cancellationToken);
 
     /// <summary>
     /// Every live allocation pointing at one document, tracked. Used when a document is cancelled and

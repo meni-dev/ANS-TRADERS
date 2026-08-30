@@ -21,5 +21,6 @@ public static class ShopSettingsMapper
         settings.BankDetails,
         settings.InvoiceTerms,
         settings.InvoiceTemplate.ToString(),
-        settings.BooksLockedUpTo);
+        settings.BooksLockedUpTo,
+        settings.BooksStartFrom);
 }

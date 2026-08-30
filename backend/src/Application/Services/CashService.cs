@@ -25,6 +25,8 @@ public class CashService : ICashService
     public async Task<CashPositionDto> GetPositionAsync(
         DateOnly date, CancellationToken cancellationToken)
     {
+        _currentUser.RequireAny("see the drawer", Permission.CashDayClose, Permission.CostView);
+
         var closed = await _repository.GetCloseAsync(date, cancellationToken);
 
         if (closed is not null)
@@ -33,7 +35,8 @@ public class CashService : ICashService
             // afterwards silently rewrite a count somebody signed off.
             return new CashPositionDto(
                 date, closed.OpeningCash, closed.CashReceived, closed.CashPaidOut,
-                closed.CashExpenses, closed.ExpectedCash, true, true,
+                closed.CashExpenses, closed.CashOtherIn, closed.CashOtherOut,
+                closed.ExpectedCash, true, true,
                 closed.CountedCash, closed.Difference, closed.Reason);
         }
 
@@ -41,9 +44,24 @@ public class CashService : ICashService
         var day = await MovementsForAsync(date, cancellationToken);
 
         return new CashPositionDto(
-            date, opening, day.Received, day.PaidOut, day.Expenses,
-            Round(opening + day.Received - day.PaidOut - day.Expenses),
+            date, opening, day.Received, day.PaidOut, day.Expenses, day.OtherIn, day.OtherOut,
+            Round(opening + day.Net),
             carried, false, null, null, null);
+    }
+
+    public async Task<decimal> GetExpectedCashAsync(DateOnly date, CancellationToken cancellationToken)
+    {
+        var closed = await _repository.GetCloseAsync(date, cancellationToken);
+
+        if (closed is not null)
+        {
+            return closed.ExpectedCash;
+        }
+
+        var (opening, _) = await OpeningForAsync(date, cancellationToken);
+        var day = await MovementsForAsync(date, cancellationToken);
+
+        return Round(opening + day.Net);
     }
 
     public async Task<DayCloseDto> CloseDayAsync(
@@ -74,7 +92,23 @@ public class CashService : ICashService
         var (opening, _) = await OpeningForAsync(request.CloseDate, cancellationToken);
         var day = await MovementsForAsync(request.CloseDate, cancellationToken);
 
-        var expected = Round(opening + day.Received - day.PaidOut - day.Expenses);
+        var expected = Round(opening + day.Net);
+
+        // A drawer cannot hold less than nothing. Reaching here means cash went out that never came
+        // in — almost always money drawn from the bank, or the owner's own, that nobody recorded.
+        //
+        // Refused at the close rather than at each payment, because a day is entered in whatever
+        // order the counter gets to it and a mid-day negative is not yet a mistake. By closing time
+        // it is.
+        if (expected < 0)
+        {
+            throw Invalid(
+                "CloseDate",
+                $"The till works out to {expected:0.00}, and cash cannot be less than nothing. "
+                + "Something paid out today was not in the drawer — record where it came from "
+                + "(money drawn from the bank, or capital put in) and close again.");
+        }
+
         var difference = Round(counted - expected);
 
         // A difference either way needs a sentence. An unexplained surplus is as much a sign of a
@@ -96,6 +130,8 @@ public class CashService : ICashService
             CashReceived = day.Received,
             CashPaidOut = day.PaidOut,
             CashExpenses = day.Expenses,
+            CashOtherIn = day.OtherIn,
+            CashOtherOut = day.OtherOut,
             ExpectedCash = expected,
             CountedCash = counted,
             Difference = difference,
@@ -112,6 +148,8 @@ public class CashService : ICashService
     public async Task<CashBookDto> GetCashBookAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
+        _currentUser.RequireAny("read the cash book", Permission.CashDayClose, Permission.CostView);
+
         var (opening, _) = await OpeningForAsync(fromDate, cancellationToken);
 
         var movements = await _repository.GetCashMovementsAsync(fromDate, toDate, cancellationToken);
@@ -194,7 +232,7 @@ public class CashService : ICashService
             // Nothing has ever been closed, so everything the app has seen is still notionally in
             // the drawer. Honest, and it stops the first close being wrong by the whole history.
             var all = await MovementsBetweenAsync(new DateOnly(2000, 1, 1), previous, cancellationToken);
-            return (Round(all.Received - all.PaidOut - all.Expenses), true);
+            return (Round(all.Net), true);
         }
 
         if (last.CloseDate == previous)
@@ -203,31 +241,48 @@ public class CashService : ICashService
         }
 
         var since = await MovementsBetweenAsync(last.CloseDate.AddDays(1), previous, cancellationToken);
-        return (Round(last.CountedCash + since.Received - since.PaidOut - since.Expenses), true);
+        return (Round(last.CountedCash + since.Net), true);
     }
 
-    private Task<(decimal Received, decimal PaidOut, decimal Expenses)> MovementsForAsync(
-        DateOnly date, CancellationToken cancellationToken) =>
+    private Task<DayCash> MovementsForAsync(DateOnly date, CancellationToken cancellationToken) =>
         MovementsBetweenAsync(date, date, cancellationToken);
 
-    private async Task<(decimal Received, decimal PaidOut, decimal Expenses)> MovementsBetweenAsync(
+    /// <summary>
+    /// The four things that move a drawer, kept apart because the day close screen names them
+    /// separately and somebody counting notes needs to see which is which.
+    /// </summary>
+    private readonly record struct DayCash(
+        decimal Received, decimal PaidOut, decimal Expenses, decimal OtherIn, decimal OtherOut)
+    {
+        public decimal Net => Received - PaidOut - Expenses + OtherIn - OtherOut;
+    }
+
+    private async Task<DayCash> MovementsBetweenAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
         if (fromDate > toDate)
         {
-            return (0m, 0m, 0m);
+            return default;
         }
 
         var movements = await _repository.GetCashMovementsAsync(fromDate, toDate, cancellationToken);
 
-        return (
+        // Anything that is not a receipt, a payment out or an expense is money with no party behind
+        // it — the float, the bank, the owner's pocket. Summed by what it did to the drawer rather
+        // than by naming each kind, so a kind added later is counted without touching this.
+        static bool IsTrade(string kind) => kind is "Receipt" or "Paid out" or "Expense";
+
+        return new DayCash(
             Round(movements.Where(m => m.Kind == "Receipt").Sum(m => m.In)),
             Round(movements.Where(m => m.Kind == "Paid out").Sum(m => m.Out)),
-            Round(movements.Where(m => m.Kind == "Expense").Sum(m => m.Out)));
+            Round(movements.Where(m => m.Kind == "Expense").Sum(m => m.Out)),
+            Round(movements.Where(m => !IsTrade(m.Kind)).Sum(m => m.In)),
+            Round(movements.Where(m => !IsTrade(m.Kind)).Sum(m => m.Out)));
     }
 
     private static DayCloseDto ToDto(DayClose d) => new(
         d.Id, d.CloseDate, d.OpeningCash, d.CashReceived, d.CashPaidOut, d.CashExpenses,
+        d.CashOtherIn, d.CashOtherOut,
         d.ExpectedCash, d.CountedCash, d.Difference, d.Reason, d.Notes, d.CreatedAt);
 
     private static string? Clean(string? value) =>

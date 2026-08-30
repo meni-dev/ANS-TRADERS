@@ -1,5 +1,18 @@
 import { z } from 'zod'
 
+/**
+ * A rate of zero cannot say on its own whether goods are nil rated, exempt or outside GST — and
+ * GSTR-1 keeps the three in different tables. Almost every spare part is Taxable.
+ */
+export type SupplyType = 'Taxable' | 'NilRated' | 'Exempt' | 'NonGst'
+
+export const SUPPLY_TYPES: { value: SupplyType; label: string; hint: string }[] = [
+  { value: 'Taxable', label: 'Taxable', hint: 'Ordinary goods at a GST rate' },
+  { value: 'NilRated', label: 'Nil rated', hint: 'Rated at nil in the tariff' },
+  { value: 'Exempt', label: 'Exempted', hint: 'Exempted by notification' },
+  { value: 'NonGst', label: 'Outside GST', hint: 'Petrol, diesel, alcohol' },
+]
+
 export type ProductDto = {
   id: string
   itemCode: string
@@ -10,6 +23,8 @@ export type ProductDto = {
   vehicleModel?: string | null
   hsn: string
   gstRate: number
+  /** Mirrors `Domain.Enums.SupplyType` — which GSTR-1 table this part belongs in. */
+  supplyType: SupplyType
   cgstRate: number
   sgstRate: number
   uqc: string
@@ -37,6 +52,7 @@ const baseProductFields = {
   vehicleModel: z.string().max(100).optional().or(z.literal('')),
   hsn: z.string().min(1, 'HSN code is required').max(20),
   gstRate: z.number('Enter a GST rate').min(0, 'Cannot be negative').max(100, 'Cannot exceed 100'),
+  supplyType: z.enum(['Taxable', 'NilRated', 'Exempt', 'NonGst']),
   uqc: z.string().min(1, 'UQC is required').max(20),
   purchaseRate: z.number('Enter a purchase rate').min(0, 'Cannot be negative'),
   sellingRate: z.number('Enter a selling rate').min(0, 'Cannot be negative'),

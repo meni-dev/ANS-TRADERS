@@ -1,8 +1,8 @@
+import { describeError } from '@/lib/api/errors'
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { ShopLogo } from '@/components/brand/ShopLogo'
-import { ApiError } from '@/lib/api/client'
 import { useAuth } from './AuthProvider'
 
 export function LoginPage() {
@@ -28,22 +28,32 @@ export function LoginPage() {
     } catch (caught) {
       // The server deliberately gives one message for a wrong username and a wrong password, so
       // there is nothing to unpack per field here.
-      setError(
-        caught instanceof ApiError
-          ? Object.values(caught.errors)[0]?.[0] ?? caught.message
-          : 'Could not reach the server',
-      )
+      setError(describeError(caught, 'Could not reach the server'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: 'background.default', p: 2 }}>
+    // Anchored rather than centred. A centred card re-centres as it grows, so the moment the error
+    // appears the whole form jumps up under the cursor — and the field somebody is about to correct
+    // moves out from under them. Anchored, the alert only ever pushes downward.
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        pt: { xs: 6, sm: '16vh' },
+        pb: 6,
+        px: 2,
+        bgcolor: 'background.default',
+      }}
+    >
       <Paper sx={{ width: '100%', maxWidth: 380, p: 4 }}>
         <Stack spacing={3} component="form" onSubmit={submit}>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-            <ShopLogo height={38} />
+            <ShopLogo height={40} />
             <Box>
               <Typography sx={{ fontSize: 17, fontWeight: 700, lineHeight: 1.2 }}>ANS Traders</Typography>
               <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>Sign in to the counter</Typography>

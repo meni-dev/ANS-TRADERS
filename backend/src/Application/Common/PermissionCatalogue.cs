@@ -33,6 +33,8 @@ public static class PermissionCatalogue
         (Permission.PaymentCancel, "Money", "Cancel a payment", "Reverse a receipt or a payment already recorded"),
         (Permission.ExpenseRecord, "Money", "Record expenses", "Rent, salary, freight, shop expenses"),
         (Permission.CashDayClose, "Money", "Close the day", "Count the drawer and sign the day off"),
+        (Permission.CapitalMovement, "Money", "Move money in and out",
+            "Bank to till and back, capital the owner puts in, drawings taken out"),
 
         (Permission.CostView, "The numbers", "See cost and profit",
             "Buying price, margin, profit and loss, dead stock value. Most shops keep this off the counter"),

@@ -22,4 +22,10 @@ public enum AuditAction
 
     /// <summary>Somebody was moved from one role to another.</summary>
     UserRoleChanged = 11,
+
+    /// <summary>Money moved between the bank and the till, or in and out of the business.</summary>
+    MoneyMoved = 12,
+
+    /// <summary>The shop's own details changed — its GSTIN, its state, its name.</summary>
+    SettingsChanged = 13,
 }

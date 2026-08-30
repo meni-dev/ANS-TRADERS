@@ -1,3 +1,6 @@
+import { describeError } from '@/lib/api/errors'
+import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { DocumentTotals } from '@/components/document/DocumentTotals'
 import { LineItemsEditor } from '@/components/document/LineItemsEditor'
 import { useNotification } from '@/components/feedback/NotificationProvider'
@@ -10,14 +13,12 @@ import { useShopSettings } from '@/features/settings/hooks'
 import { CustomerPicker } from '@/features/customers/components/CustomerPicker'
 import { CustomerCreditStrip } from '@/features/payments/components/CustomerCreditStrip'
 import type { CustomerDto } from '@/features/customers/types'
-import { ApiError } from '@/lib/api/client'
 import { applyBillDiscount, computeDocument, isInterState as computeIsInterState } from '@/lib/documents/gst'
 import { emptyLine, PAYMENT_MODES, type DocumentLineValues } from '@/lib/documents/types'
 import { todayIso } from '@/lib/format'
 import { zodResolver } from '@hookform/resolvers/zod'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
-import { Alert, Box, Button, Chip, Grid, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, Grid, Paper, Stack, Tooltip, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { FormProvider, useForm, useWatch } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
@@ -96,28 +97,19 @@ export function InvoiceFormPage() {
       notify(`Invoice ${created.invoiceNumber} issued`)
       navigate(`/billing/${created.id}`, { replace: true })
     } catch (error) {
-      setServerError(
-        error instanceof ApiError ? error.message : 'Something went wrong. Please try again.',
-      )
+      setServerError(describeError(error, 'Something went wrong. Please try again.'))
     }
   })
 
   return (
     <Box>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', mb: 2.5 }}>
-        <Tooltip title="Back to invoices">
-          <IconButton size="small" onClick={() => navigate('/billing')} sx={{ mt: 0.25 }}>
-            <ArrowBackIcon sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Tooltip>
-
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <Typography variant="h1">New Invoice</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            The invoice number is assigned when you save, and cannot be changed afterwards.
-          </Typography>
-        </Box>
-      </Stack>
+      <PageHeader
+        title="New Invoice"
+        icon={<PointOfSaleOutlinedIcon />}
+        iconTone="blue"
+        caption="The invoice number is assigned when you save, and cannot be changed afterwards."
+        onBack={() => navigate('/billing')}
+      />
 
       <FormProvider {...form}>
         {/* noValidate hands validation to zod — see the note in CreateProductDialog. */}
@@ -162,7 +154,6 @@ export function InvoiceFormPage() {
                   label="Invoice Date"
                   type="date"
                   required
-                  slotProps={{ inputLabel: { shrink: true } }}
                 />
               </Grid>
             </Grid>

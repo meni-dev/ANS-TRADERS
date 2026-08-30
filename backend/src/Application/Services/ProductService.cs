@@ -17,24 +17,62 @@ public class ProductService : IProductService
     private readonly IValidator<UpdateProductRequest> _updateValidator;
     private readonly ICurrentUser _currentUser;
 
+    private readonly IMoneyMovementRepository _money;
+    private readonly IShopClock _clock;
+    private readonly IShopSettingsRepository _settings;
+
     public ProductService(
         IProductRepository repository,
         IStockLedger stockLedger,
         IValidator<CreateProductRequest> createValidator,
         IValidator<UpdateProductRequest> updateValidator,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        IMoneyMovementRepository money,
+        IShopClock clock,
+        IShopSettingsRepository settings)
     {
         _repository = repository;
         _stockLedger = stockLedger;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _currentUser = currentUser;
+        _money = money;
+        _clock = clock;
+        _settings = settings;
     }
+
+    /// <summary>
+    /// The day a shop's opening figures belong on: the day its books begin.
+    /// <para>
+    /// This used to be the day somebody typed the part in, which is a different thing entirely. A
+    /// shop that keys its catalogue in August and then back-dates April's bills ends up with every
+    /// sale sitting <em>before</em> the stock it sold — the shelf reads negative for four months and
+    /// a year-end valuation is nonsense. Opening stock is what was there when the books opened, so
+    /// that is the date it carries.
+    /// </para>
+    /// <para>
+    /// A shop that has not said when its books begin has nothing better to offer than today.
+    /// </para>
+    /// </summary>
+    private async Task<DateOnly> OpeningDateAsync(CancellationToken cancellationToken)
+    {
+        var settings = await _settings.GetAsync(cancellationToken);
+
+        return settings.BooksStartFrom is { } start && start <= _clock.Today ? start : _clock.Today;
+    }
+
 
     /// <summary>
     /// Whether this caller sees buying prices. Managing the catalogue means typing the rates in, so
     /// that permission carries the right to read them without needing the cost one as well.
     /// </summary>
+    /// <summary>
+    /// Missing means taxable — almost every part is, and an import that carries no such column
+    /// should not silently reclassify a catalogue.
+    /// </summary>
+    private static SupplyType ParseSupply(string? value) =>
+        Enum.TryParse<SupplyType>(value, ignoreCase: true, out var parsed) ? parsed : SupplyType.Taxable;
+
     private bool ShowCost =>
         _currentUser.Has(Permission.CostView) || _currentUser.Has(Permission.ProductManage);
 
@@ -77,6 +115,7 @@ public class ProductService : IProductService
             VehicleModel = request.VehicleModel,
             Hsn = request.Hsn,
             GstRate = request.GstRate,
+            SupplyType = ParseSupply(request.SupplyType),
             CgstRate = HalfOf(request.GstRate),
             SgstRate = HalfOf(request.GstRate),
             Uqc = request.Uqc,
@@ -89,6 +128,27 @@ public class ProductService : IProductService
 
         await _repository.AddAsync(product, cancellationToken);
 
+        var openingDate = await OpeningDateAsync(cancellationToken);
+
+        // Opening stock arrives on the shelf out of nowhere otherwise — goods the shop owns that
+        // nobody paid for and nobody is owed for. Recording what it was worth does not make this
+        // double-entry, but it does mean the shop can say what it started with.
+        if (product.OpeningStock > 0 && product.PurchaseRate > 0)
+        {
+            await _money.AddAsync(
+                new MoneyMovement
+                {
+                    MovementDate = openingDate,
+                    Kind = MoneyMovementKind.OpeningStock,
+                    Amount = Math.Round(
+                        product.OpeningStock * product.PurchaseRate, 2, MidpointRounding.AwayFromZero),
+                    AffectsCash = false,
+                    ReferenceNumber = product.PartNumber,
+                    Notes = $"Opening stock of {product.ItemName}",
+                },
+                cancellationToken);
+        }
+
         // Opening stock enters through the ledger like everything else, so the very first row of a
         // product's history explains where its quantity came from.
         if (request.OpeningStock != 0)
@@ -97,6 +157,7 @@ public class ProductService : IProductService
                 product,
                 request.OpeningStock,
                 StockMovementType.Opening,
+                openingDate,
                 referenceId: null,
                 referenceNumber: null,
                 notes: "Opening stock",
@@ -131,6 +192,7 @@ public class ProductService : IProductService
         product.VehicleModel = request.VehicleModel;
         product.Hsn = request.Hsn;
         product.GstRate = request.GstRate;
+        product.SupplyType = ParseSupply(request.SupplyType);
         product.CgstRate = HalfOf(request.GstRate);
         product.SgstRate = HalfOf(request.GstRate);
         product.Uqc = request.Uqc;

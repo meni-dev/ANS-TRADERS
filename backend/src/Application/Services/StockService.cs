@@ -113,6 +113,7 @@ public class StockService : IStockService
             product,
             difference,
             StockMovementType.Adjustment,
+            _clock.Today,
             referenceId: null,
             referenceNumber: null,
             notes: string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
@@ -138,6 +139,8 @@ public class StockService : IStockService
     public async Task<StockLossReportDto> GetLossReportAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
+        _currentUser.RequireAny("see what the shop has lost", Permission.StockAdjust, Permission.CostView);
+
         var adjustments = await _repository.GetAdjustmentsAsync(fromDate, toDate, cancellationToken);
 
         // Only the ones that took stock away. A counting error that *found* stock is not a loss, and

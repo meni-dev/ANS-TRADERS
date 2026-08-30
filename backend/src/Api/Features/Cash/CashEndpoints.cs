@@ -34,5 +34,35 @@ public static class CashEndpoints
         group.MapPost("/close", async (
             CloseDayRequest request, ICashService service, CancellationToken cancellationToken) =>
             Results.Ok(await service.CloseDayAsync(request, cancellationToken)));
+
+        // Money with no party behind it. Its own group under cash because that is where somebody
+        // looking for "where did the till get this from" will go.
+        var money = app.MapGroup("/api/money").WithTags("Money");
+
+        money.MapGet("/", async (
+            DateOnly? fromDate, DateOnly? toDate,
+            IMoneyMovementService service, IShopClock clock, CancellationToken cancellationToken) =>
+        {
+            var to = toDate ?? clock.Today;
+            var from = fromDate ?? new DateOnly(to.Year, to.Month, 1);
+
+            return Results.Ok(await service.SearchAsync(from, to, cancellationToken));
+        });
+
+        money.MapPost("/", async (
+            RecordMoneyMovementRequest request,
+            IMoneyMovementService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.RecordAsync(request, cancellationToken)));
+
+        money.MapPost("/{id:guid}/cancel", async (
+            Guid id, IMoneyMovementService service, CancellationToken cancellationToken) =>
+        {
+            await service.CancelAsync(id, cancellationToken);
+            return Results.NoContent();
+        });
+
+        money.MapGet("/capital", async (IMoneyMovementService service, CancellationToken cancellationToken) =>
+            Results.Ok(await service.GetCapitalAsync(cancellationToken)));
     }
 }

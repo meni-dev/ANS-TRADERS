@@ -1,3 +1,5 @@
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { DocumentLinesTable } from '@/components/document/DocumentLinesTable'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { BalanceChip, DocumentStatusChip } from '@/components/document/DocumentStatusChip'
@@ -5,10 +7,9 @@ import { DocumentTotals } from '@/components/document/DocumentTotals'
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { formatDate } from '@/lib/format'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import AssignmentReturnOutlinedIcon from '@mui/icons-material/AssignmentReturnOutlined'
 import BlockIcon from '@mui/icons-material/Block'
-import { Alert, Box, Button, Chip, CircularProgress, Grid, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, CircularProgress, Grid, Paper, Stack, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCancelPurchase, usePurchase } from '../hooks'
@@ -63,49 +64,45 @@ export function PurchaseDetailPage() {
 
   return (
     <Box>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', mb: 2.5 }}>
-        <Tooltip title="Back to purchases">
-          <IconButton size="small" onClick={() => navigate('/purchases')} sx={{ mt: 0.25 }}>
-            <ArrowBackIcon sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Tooltip>
-
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
-            <Typography variant="h1">{purchase.purchaseNumber}</Typography>
+      <PageHeader
+        title={purchase.purchaseNumber}
+        icon={<ReceiptLongOutlinedIcon />}
+        iconTone="violet"
+        badge={
+          <>
             <DocumentStatusChip status={purchase.status} />
             {!isCancelled && (
               <BalanceChip balanceDue={purchase.balanceDue} grandTotal={purchase.grandTotal} />
             )}
+          </>
+        }
+        caption={`Supplier bill ${purchase.supplierInvoiceNumber} · ${formatDate(purchase.invoiceDate)}`}
+        onBack={() => navigate('/purchases')}
+        actions={
+          <Stack direction="row" spacing={1}>
+            {/* Goods go back from the shelf the bill filled, so the return starts from that bill. */}
+            {!isCancelled && can('PurchaseReturn') && (
+              <Button
+                variant="outlined"
+                startIcon={<AssignmentReturnOutlinedIcon sx={{ fontSize: 18 }} />}
+                onClick={() => navigate(`/purchases/${purchase.id}/return`)}
+              >
+                Return items
+              </Button>
+            )}
+            {!isCancelled && can('PurchaseCancel') && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<BlockIcon sx={{ fontSize: 18 }} />}
+                onClick={() => setConfirmOpen(true)}
+              >
+                Cancel Bill
+              </Button>
+            )}
           </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Supplier bill {purchase.supplierInvoiceNumber} · {formatDate(purchase.invoiceDate)}
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={1}>
-          {/* Goods go back from the shelf the bill filled, so the return starts from that bill. */}
-          {!isCancelled && can('PurchaseReturn') && (
-            <Button
-              variant="outlined"
-              startIcon={<AssignmentReturnOutlinedIcon sx={{ fontSize: 18 }} />}
-              onClick={() => navigate(`/purchases/${purchase.id}/return`)}
-            >
-              Return items
-            </Button>
-          )}
-          {!isCancelled && can('PurchaseCancel') && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<BlockIcon sx={{ fontSize: 18 }} />}
-              onClick={() => setConfirmOpen(true)}
-            >
-              Cancel Bill
-            </Button>
-          )}
-        </Stack>
-      </Stack>
+        }
+      />
 
       {isCancelled && (
         <Alert severity="warning" sx={{ mb: 2 }}>

@@ -1,3 +1,5 @@
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import {
   Box,
   Chip,
@@ -57,11 +59,13 @@ export function AuditPage() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        Every cancellation, stock correction and lock change, with the name of whoever did it. Rows
-        are written in the same transaction as the thing they describe, so nothing here can be
-        removed without removing the document too.
-      </Typography>
+      <PageHeader
+        title="Audit Trail"
+        icon={<HistoryOutlinedIcon />}
+        iconTone="amber"
+        caption="Every cancellation, stock correction and lock change, with the name of whoever did it. Rows are written in the same transaction as the thing they describe, so nothing here can be removed without removing the document too."
+        flush
+      />
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
         <TextField

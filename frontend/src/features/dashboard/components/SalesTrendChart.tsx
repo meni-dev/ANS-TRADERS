@@ -1,5 +1,7 @@
 import { formatCurrency, formatDate } from '@/lib/format'
-import { Box, Paper, Stack, Typography } from '@mui/material'
+import { PanelCard } from '@/components/data/PanelCard'
+import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined'
+import { Box, Typography } from '@mui/material'
 import { useState } from 'react'
 import type { SalesTrendPointDto } from '../types'
 
@@ -23,6 +25,7 @@ const MAX_BAR_W = 24
 const BAR_GAP = 2
 
 const SERIES = '#4880FF'
+const SERIES_DEEP = '#2F63E8'
 
 /**
  * Rounds an axis maximum up to a clean 1 / 2 / 5 × 10^n, so ticks land on numbers a person would
@@ -68,24 +71,20 @@ export function SalesTrendChart({ points, loading }: SalesTrendChartProps) {
   const active = hovered === null ? null : points[hovered]
 
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '8px' }}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={1}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'baseline' }, mb: 2 }}
-      >
-        <Box>
-          {/* Single series, so the title names what is plotted and no legend box is needed. */}
-          <Typography variant="h3">Sales — last 30 days</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            Billed value per day, cancelled invoices excluded.
-          </Typography>
-        </Box>
-        <Typography sx={{ fontSize: 13, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+    // Single series, so the title names what is plotted and no legend box is needed.
+    <PanelCard
+      title="Sales — last 30 days"
+      icon={<BarChartOutlinedIcon />}
+      iconTone="blue"
+      caption="Billed value per day, cancelled invoices excluded."
+      action={
+        <Typography
+          sx={{ fontSize: 13, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
+        >
           {formatCurrency(total)} total
         </Typography>
-      </Stack>
-
+      }
+    >
       <Box sx={{ position: 'relative' }}>
         <Box
           component="svg"
@@ -95,6 +94,18 @@ export function SalesTrendChart({ points, loading }: SalesTrendChartProps) {
           sx={{ width: '100%', height: 220, display: 'block', opacity: loading ? 0.35 : 1 }}
           onMouseLeave={() => setHovered(null)}
         >
+          <defs>
+            {/* Lighter at the foot, so a tall bar does not read as heavier than it is. */}
+            <linearGradient id="salesBar" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={SERIES_DEEP} />
+              <stop offset="100%" stopColor={SERIES} />
+            </linearGradient>
+            <linearGradient id="salesBarPeak" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#173473" />
+              <stop offset="100%" stopColor={SERIES_DEEP} />
+            </linearGradient>
+          </defs>
+
           {/* Gridlines: hairline, solid, one step off the surface — present but recessive. */}
           {ticks.map((tick) => (
             <g key={tick}>
@@ -105,6 +116,7 @@ export function SalesTrendChart({ points, loading }: SalesTrendChartProps) {
                 y2={y(tick)}
                 stroke="#E7EAF0"
                 strokeWidth={1}
+                strokeDasharray={tick === 0 ? undefined : '3 4'}
               />
               <text
                 x={PAD.left - 10}
@@ -121,6 +133,8 @@ export function SalesTrendChart({ points, loading }: SalesTrendChartProps) {
           {points.map((point, index) => {
             const barH = point.salesTotal > 0 ? Math.max(2, PLOT_H - (y(point.salesTotal) - PAD.top)) : 0
             const isHovered = hovered === index
+            const isPeak = busiest !== null && point.date === busiest.date && point.salesTotal > 0
+            const fill = isPeak ? 'url(#salesBarPeak)' : 'url(#salesBar)'
 
             return (
               <g key={point.date}>
@@ -133,8 +147,8 @@ export function SalesTrendChart({ points, loading }: SalesTrendChartProps) {
                     // Rounded data-end, square at the baseline: the radius is drawn on all corners
                     // and the overhanging rect below re-squares the two that sit on the axis.
                     rx={4}
-                    fill={SERIES}
-                    opacity={hovered === null || isHovered ? 1 : 0.45}
+                    fill={fill}
+                    opacity={hovered === null || isHovered ? 1 : 0.4}
                   />
                 )}
                 {barH > 4 && (
@@ -143,8 +157,8 @@ export function SalesTrendChart({ points, loading }: SalesTrendChartProps) {
                     y={PAD.top + PLOT_H - 4}
                     width={barW}
                     height={4}
-                    fill={SERIES}
-                    opacity={hovered === null || isHovered ? 1 : 0.45}
+                    fill={fill}
+                    opacity={hovered === null || isHovered ? 1 : 0.4}
                   />
                 )}
 
@@ -218,6 +232,6 @@ export function SalesTrendChart({ points, loading }: SalesTrendChartProps) {
           Busiest day {formatDate(busiest.date)} · {formatCurrency(busiest.salesTotal)}
         </Typography>
       )}
-    </Paper>
+    </PanelCard>
   )
 }

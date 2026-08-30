@@ -1,3 +1,4 @@
+using Application.Interfaces;
 using FluentValidation;
 
 namespace Application.Validators;
@@ -24,9 +25,15 @@ public static class DocumentLineRules
     /// <summary>
     /// A document dated in the future would land in a GST return period that has not opened yet.
     /// Back-dating is left alone: bills genuinely arrive days after they are raised.
+    /// <para>
+    /// Today is the shop's today, not the server's. This used to allow <c>UtcNow + 1 day</c>, which
+    /// on a UTC server made tomorrow a legal bill date — while an expense or a day close, which ask
+    /// <see cref="IShopClock"/>, refused it. One rule now, from one clock.
+    /// </para>
     /// </summary>
-    public static IRuleBuilderOptions<T, DateOnly> DocumentDate<T>(this IRuleBuilder<T, DateOnly> rule) =>
+    public static IRuleBuilderOptions<T, DateOnly> DocumentDate<T>(
+        this IRuleBuilder<T, DateOnly> rule, IShopClock clock) =>
         rule.NotEmpty().WithMessage("Pick a date")
-            .LessThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)))
-            .WithMessage("Date cannot be in the future");
+            .LessThanOrEqualTo(_ => clock.Today)
+            .WithMessage(_ => $"That date has not arrived yet — today is {clock.Today:dd MMM yyyy}");
 }

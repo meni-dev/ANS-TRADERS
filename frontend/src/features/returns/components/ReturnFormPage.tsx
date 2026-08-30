@@ -1,14 +1,14 @@
-import { ApiError } from '@/lib/api/client'
+import { describeError } from '@/lib/api/errors'
+import AssignmentReturnOutlinedIcon from '@mui/icons-material/AssignmentReturnOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { computeLine } from '@/lib/documents/gst'
 import { formatCurrency, formatDate, todayIso } from '@/lib/format'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import {
   Alert,
   Box,
   Button,
   Divider,
   FormControlLabel,
-  IconButton,
   MenuItem,
   Paper,
   Stack,
@@ -116,11 +116,7 @@ export function ReturnFormPage({ side }: ReturnFormPageProps) {
 
       navigate(isSales ? `/billing/returns/${note.id}` : `/purchases/returns/${note.id}`)
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? (Object.values(caught.errors).flat()[0] ?? caught.message)
-          : 'Could not record this return',
-      )
+      setError(describeError(caught, 'Could not record this return'))
     }
   }
 
@@ -130,19 +126,14 @@ export function ReturnFormPage({ side }: ReturnFormPageProps) {
 
   return (
     <Stack spacing={2.5}>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-        <IconButton onClick={() => navigate(backTo)} aria-label="Back">
-          <ArrowBackIcon />
-        </IconButton>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            {isSales ? 'Goods coming back' : 'Goods going back'}
-          </Typography>
-          <Typography sx={{ fontSize: 13.5, color: 'text.secondary' }}>
-            {document.documentNumber} · {document.partyName} · {formatDate(document.documentDate)}
-          </Typography>
-        </Box>
-      </Stack>
+      <PageHeader
+        title={isSales ? 'Goods coming back' : 'Goods going back'}
+        icon={<AssignmentReturnOutlinedIcon />}
+        iconTone="rose"
+        caption={`${document.documentNumber} · ${document.partyName} · ${formatDate(document.documentDate)}`}
+        onBack={() => navigate(backTo)}
+        flush
+      />
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
@@ -158,7 +149,6 @@ export function ReturnFormPage({ side }: ReturnFormPageProps) {
                 label="Date"
                 value={noteDate}
                 onChange={(event) => setNoteDate(event.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
               />
               <TextField
                 size="small"

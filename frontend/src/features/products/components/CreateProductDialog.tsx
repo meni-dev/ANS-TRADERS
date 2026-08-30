@@ -1,8 +1,8 @@
+import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
-import { ApiError } from '@/lib/api/client'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Grid } from '@mui/material'
@@ -23,6 +23,7 @@ const defaultValues: CreateProductFormValues = {
   hsn: '',
   gstRate: 18,
   uqc: 'PCS',
+  supplyType: 'Taxable' as const,
   purchaseRate: 0,
   sellingRate: 0,
   mrp: 0,
@@ -59,11 +60,7 @@ export function CreateProductDialog({ open, onClose }: CreateProductDialogProps)
       form.reset(defaultValues)
       onClose()
     } catch (error) {
-      if (error instanceof ApiError) {
-        setServerError(error.message)
-      } else {
-        setServerError('Something went wrong. Please try again.')
-      }
+      setServerError(describeError(error, 'Something went wrong. Please try again.'))
     }
   })
 

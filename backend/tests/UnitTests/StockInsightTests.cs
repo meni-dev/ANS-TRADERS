@@ -22,6 +22,9 @@ internal sealed class FakeShelfRepository : IStockRepository
     public Task AddMovementAsync(StockMovement movement, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 
+    public Task<decimal> GetBalanceOnAsync(Guid productId, DateOnly onDate, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
     public Task<(IReadOnlyList<Product> Items, int TotalCount)> SearchStockAsync(
         string? search, bool? lowOnly, bool? activeOnly, int page, int pageSize,
         CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -59,6 +62,10 @@ internal sealed class AllowAllCurrentUser : ICurrentUser
     public bool Has(Permission permission) => true;
 
     public void Require(Permission permission, string action)
+    {
+    }
+
+    public void RequireAny(string action, params Permission[] permissions)
     {
     }
 }

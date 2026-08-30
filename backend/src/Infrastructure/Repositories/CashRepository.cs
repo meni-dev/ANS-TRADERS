@@ -27,6 +27,12 @@ public class CashRepository : ICashRepository
             .OrderByDescending(d => d.CloseDate)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public Task<DayClose?> GetLatestCloseAsync(CancellationToken cancellationToken) =>
+        _context.DayCloses
+            .AsNoTracking()
+            .OrderByDescending(d => d.CloseDate)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<CashBookEntryDto>> GetCashMovementsAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
@@ -77,8 +83,47 @@ public class CashRepository : ICashRepository
             e.Amount,
             0m)));
 
+        // Money with no party behind it: the opening float, the bank, the owner's own pocket.
+        // AffectsCash is what keeps a capital introduction paid straight into the bank out of a
+        // drawer it never passed through.
+        var movements = await _context.MoneyMovements
+            .AsNoTracking()
+            .Where(m => m.AffectsCash
+                        && !m.IsCancelled
+                        && m.MovementDate >= fromDate && m.MovementDate <= toDate)
+            .Select(m => new { m.MovementDate, m.Kind, m.Amount, m.ReferenceNumber, m.Notes })
+            .ToListAsync(cancellationToken);
+
+        entries.AddRange(movements.Select(m => new CashBookEntryDto(
+            m.MovementDate,
+            MoneyMovementLabel(m.Kind),
+            m.ReferenceNumber ?? string.Empty,
+            m.Notes ?? MoneyMovementLabel(m.Kind),
+            MovesCashIn(m.Kind) ? m.Amount : 0m,
+            MovesCashIn(m.Kind) ? 0m : m.Amount,
+            0m)));
+
         return entries;
     }
+
+    /// <summary>Which way the till moves. Opening stock never touches it and is filtered out above.</summary>
+    private static bool MovesCashIn(MoneyMovementKind kind) => kind switch
+    {
+        MoneyMovementKind.OpeningFloat => true,
+        MoneyMovementKind.BankToCash => true,
+        MoneyMovementKind.CapitalIntroduced => true,
+        _ => false,
+    };
+
+    private static string MoneyMovementLabel(MoneyMovementKind kind) => kind switch
+    {
+        MoneyMovementKind.OpeningFloat => "Opening float",
+        MoneyMovementKind.BankToCash => "Drawn from bank",
+        MoneyMovementKind.CashToBank => "Banked",
+        MoneyMovementKind.CapitalIntroduced => "Capital introduced",
+        MoneyMovementKind.Drawings => "Drawings",
+        _ => "Opening stock",
+    };
 
     public async Task<IReadOnlyList<DayClose>> GetClosesBetweenAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken) =>

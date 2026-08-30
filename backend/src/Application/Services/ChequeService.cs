@@ -102,6 +102,17 @@ public class ChequeService : IChequeService
             $"Cheque {cheque.ChequeNumber} returned — {cheque.BounceReason}",
             cancellationToken);
 
+        // A charge that cannot be recovered is a typo, not an instruction. Silently skipping it
+        // returned 200 and recorded nothing, so the counter walked away believing the bank's charge
+        // had been put on the customer's account.
+        if (request.ChargeAmount is < 0)
+        {
+            throw new ValidationAppException(new Dictionary<string, string[]>
+            {
+                ["ChargeAmount"] = ["A bank charge cannot be negative"],
+            });
+        }
+
         // The bank's charge is recovered from the party as its own ledger line, never as an invoice:
         // it is not a taxable supply, and minting an invoice number for it would put a hole in the
         // series the audit check watches.

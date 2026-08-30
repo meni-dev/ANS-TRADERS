@@ -11,6 +11,10 @@ public class UpdateSupplierRequestValidator : AbstractValidator<UpdateSupplierRe
         RuleFor(x => x.Phone).PartyPhone();
         RuleFor(x => x.Email).PartyEmail().MaximumLength(200);
         RuleFor(x => x.Gstin).PartyGstin();
+
+        RuleFor(x => x.Gstin)
+            .Must((req, gstin) => GstRules.StateMatches(gstin, req.StateCode))
+            .WithMessage("The GSTIN starts with a different state code than the state chosen");
         RuleFor(x => x.ContactPerson).MaximumLength(200);
 
         RuleFor(x => x.AddressLine1).MaximumLength(200);

@@ -60,13 +60,6 @@ public class CreditNoteRepository : ICreditNoteRepository
         return (items, totalCount);
     }
 
-    public async Task<int> GetLastSequenceAsync(
-        string financialYear, CancellationToken cancellationToken) =>
-        await _context.CreditNotes
-            .Where(n => n.FinancialYear == financialYear)
-            .Select(n => (int?)n.Sequence)
-            .MaxAsync(cancellationToken) ?? 0;
-
     /// <remarks>
     /// Cancelled notes are included on purpose: they keep their number, so a gap always means a row
     /// that was never written rather than one that was voided.

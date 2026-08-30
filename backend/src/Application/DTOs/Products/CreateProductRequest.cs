@@ -9,6 +9,8 @@ public record CreateProductRequest(
     string? VehicleModel,
     string Hsn,
     decimal GstRate,
+    /// <summary>Defaults to Taxable when not sent, which is what almost every part is.</summary>
+    string? SupplyType,
     string Uqc,
     decimal PurchaseRate,
     decimal SellingRate,

@@ -1,3 +1,5 @@
+import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable } from '@/components/data/DataTable'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { BalanceChip, DocumentStatusChip } from '@/components/document/DocumentStatusChip'
@@ -149,33 +151,28 @@ export function PurchaseListPage() {
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-start' }, mb: 2.5 }}
-      >
-        <Box>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-            <Typography variant="h1">Purchases</Typography>
-            {!isLoading && (
-              <Chip
-                label={`${total} ${total === 1 ? 'bill' : 'bills'}`}
-                size="small"
-                sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}
-              />
-            )}
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Supplier bills as they come in — the input tax credit side of your GST return.
-          </Typography>
-        </Box>
-
-        {can('PurchaseCreate') && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/purchases/new')}>
-            Record Purchase
-          </Button>
-        )}
-      </Stack>
+      <PageHeader
+        title="Purchases"
+        icon={<ShoppingCartOutlinedIcon />}
+        iconTone="violet"
+        caption="Supplier bills as they come in — the input tax credit side of your GST return."
+        badge={
+          !isLoading && (
+            <Chip
+              label={`${total} ${total === 1 ? 'bill' : 'bills'}`}
+              size="small"
+              sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}
+            />
+          )
+        }
+        actions={
+          can('PurchaseCreate') && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/purchases/new')}>
+              Record Purchase
+            </Button>
+          )
+        }
+      />
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
         <TextField

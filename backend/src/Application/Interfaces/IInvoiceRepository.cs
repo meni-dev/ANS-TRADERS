@@ -20,7 +20,6 @@ public interface IInvoiceRepository
         CancellationToken cancellationToken);
 
     /// <summary>Highest sequence already used in the given financial year, or 0 if none.</summary>
-    Task<int> GetLastSequenceAsync(string financialYear, CancellationToken cancellationToken);
 
     Task AddAsync(Invoice invoice, CancellationToken cancellationToken);
 

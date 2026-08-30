@@ -32,6 +32,14 @@ internal sealed class FakeCurrentUser : ICurrentUser
             throw new ForbiddenException($"Your role does not let you {action}");
         }
     }
+
+    public void RequireAny(string action, params Permission[] permissions)
+    {
+        if (!permissions.Any(Has))
+        {
+            throw new ForbiddenException($"Your role does not let you {action}");
+        }
+    }
 }
 
 internal sealed class FakeRoleRepository : IRoleRepository
@@ -76,7 +84,7 @@ internal sealed class RecordingAuditLog : IAuditLog
 
     public Task RecordAsync(
         AuditAction action, string entityType, Guid? entityId, string? entityLabel,
-        string? detail, CancellationToken cancellationToken)
+        string? detail, CancellationToken cancellationToken, string? actedBy = null)
     {
         Entries.Add((action, entityType, entityLabel, detail));
         return Task.CompletedTask;

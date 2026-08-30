@@ -1,8 +1,8 @@
+import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFTextField } from '@/components/form/RHFTextField'
-import { ApiError } from '@/lib/api/client'
 import { formatCurrency, todayIso } from '@/lib/format'
 import { zodResolver } from '@hookform/resolvers/zod'
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined'
@@ -52,7 +52,7 @@ export function BounceChequeDialog({ cheque, onClose }: BounceChequeDialogProps)
       form.reset()
       onClose()
     } catch (error) {
-      setServerError(error instanceof ApiError ? error.message : 'Could not record the bounce')
+      setServerError(describeError(error, 'Could not record the bounce'))
     }
   }
 
@@ -84,7 +84,6 @@ export function BounceChequeDialog({ cheque, onClose }: BounceChequeDialogProps)
                     label="Returned on"
                     type="date"
                     required
-                    slotProps={{ inputLabel: { shrink: true } }}
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>

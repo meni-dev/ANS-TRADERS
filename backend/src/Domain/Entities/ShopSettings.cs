@@ -59,4 +59,14 @@ public class ShopSettings : AuditableEntity
     /// </para>
     /// </summary>
     public DateOnly? BooksLockedUpTo { get; set; }
+
+    /// <summary>
+    /// The day the shop's books begin. Nothing may be dated before it.
+    /// <para>
+    /// Only the future was bounded before, so one mistyped year opened a financial year that had
+    /// closed long ago — a return that can never be amended, and a register nobody will ever look at
+    /// again. Null leaves the door open, which is why the settings screen asks for it.
+    /// </para>
+    /// </summary>
+    public DateOnly? BooksStartFrom { get; set; }
 }

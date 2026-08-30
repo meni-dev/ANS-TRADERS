@@ -15,12 +15,14 @@ public static class DependencyInjection
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IPeriodLock, PeriodLock>();
+        services.AddScoped<ICashDayLock, CashDayLock>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IStockInsightService, StockInsightService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductImportService, ProductImportService>();
         services.AddScoped<IExpenseService, ExpenseService>();
         services.AddScoped<ICashService, CashService>();
+        services.AddScoped<IMoneyMovementService, MoneyMovementService>();
         services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<ISupplierService, SupplierService>();
         services.AddScoped<IPurchaseService, PurchaseService>();

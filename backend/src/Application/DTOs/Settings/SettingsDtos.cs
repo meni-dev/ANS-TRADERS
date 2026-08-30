@@ -16,7 +16,9 @@ public record ShopSettingsDto(
     string? BankDetails,
     string? InvoiceTerms,
     string InvoiceTemplate,
-    DateOnly? BooksLockedUpTo);
+    DateOnly? BooksLockedUpTo,
+    /// <summary>The day the shop's books begin. Nothing may be dated before it.</summary>
+    DateOnly? BooksStartFrom);
 
 /// <summary>
 /// Null clears the lock. Deliberately a separate request from the rest of settings: moving the lock
@@ -26,6 +28,8 @@ public record ShopSettingsDto(
 public record SetBooksLockRequest(DateOnly? LockedUpTo);
 
 public record UpdateShopSettingsRequest(
+    /// <summary>Null leaves the books open at the near end — see <see cref="ShopSettingsDto"/>.</summary>
+    DateOnly? BooksStartFrom,
     string Name,
     string? LegalName,
     string? Gstin,

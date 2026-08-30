@@ -1,3 +1,5 @@
+import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable } from '@/components/data/DataTable'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { BalanceChip, DocumentStatusChip } from '@/components/document/DocumentStatusChip'
@@ -157,33 +159,28 @@ export function InvoiceListPage() {
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-start' }, mb: 2.5 }}
-      >
-        <Box>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-            <Typography variant="h1">Invoices</Typography>
-            {!isLoading && (
-              <Chip
-                label={`${total} ${total === 1 ? 'invoice' : 'invoices'}`}
-                size="small"
-                sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}
-              />
-            )}
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Every tax invoice raised at the counter, newest first.
-          </Typography>
-        </Box>
-
-        {can('BillCreate') && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/billing/new')}>
-            New Invoice
-          </Button>
-        )}
-      </Stack>
+      <PageHeader
+        title="Invoices"
+        icon={<PointOfSaleOutlinedIcon />}
+        iconTone="blue"
+        caption="Every tax invoice raised at the counter, newest first."
+        badge={
+          !isLoading && (
+            <Chip
+              label={`${total} ${total === 1 ? 'invoice' : 'invoices'}`}
+              size="small"
+              sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}
+            />
+          )
+        }
+        actions={
+          can('BillCreate') && (
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/billing/new')}>
+              New Invoice
+            </Button>
+          )
+        }
+      />
 
       <Stack
         direction={{ xs: 'column', sm: 'row' }}

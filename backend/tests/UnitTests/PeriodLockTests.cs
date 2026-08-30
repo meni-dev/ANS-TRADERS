@@ -68,6 +68,36 @@ public class PeriodLockTests
         Assert.Contains("15-06-2026", message);
         Assert.Contains("credit note", message);
     }
+
+    /// <summary>
+    /// The books-start floor is a typo-catcher for new entries. Applied to a cancel it becomes a
+    /// trap: a document that got in before the floor existed could then never be undone, and one
+    /// purchase dated 2019 was stuck exactly that way — the app refusing the only remedy it offers.
+    /// </summary>
+    [Fact]
+    public async Task A_document_dated_before_the_books_began_can_still_be_cancelled()
+    {
+        var (periodLock, settings) = Build(null);
+        settings.Settings.BooksStartFrom = new DateOnly(2026, 4, 1);
+
+        await Assert.ThrowsAsync<ValidationAppException>(() =>
+            periodLock.GuardAsync(new DateOnly(2019, 4, 1), "purchase", CancellationToken.None));
+
+        await periodLock.GuardUndoAsync(new DateOnly(2019, 4, 1), "purchase", CancellationToken.None);
+    }
+
+    /// <summary>
+    /// The lock is a different thing and still holds. A filed month is closed to cancels as much as
+    /// to entries; the way back is to move the lock, deliberately.
+    /// </summary>
+    [Fact]
+    public async Task A_filed_month_is_still_closed_to_cancels()
+    {
+        var (periodLock, _) = Build(new DateOnly(2026, 7, 31));
+
+        await Assert.ThrowsAsync<ValidationAppException>(() =>
+            periodLock.GuardUndoAsync(new DateOnly(2026, 7, 15), "bill", CancellationToken.None));
+    }
 }
 
 public class PasswordHasherTests

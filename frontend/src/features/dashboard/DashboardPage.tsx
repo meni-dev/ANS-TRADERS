@@ -1,5 +1,10 @@
 import { StatTile } from '@/components/data/StatTile'
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
+import CallMadeIcon from '@mui/icons-material/CallMade'
+import CallReceivedIcon from '@mui/icons-material/CallReceived'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined'
+import ShowChartOutlinedIcon from '@mui/icons-material/ShowChartOutlined'
 import { usePaymentSummary } from '@/features/payments/hooks'
 import { formatCurrency, todayIso } from '@/lib/format'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
@@ -9,6 +14,7 @@ import { useNavigate } from 'react-router-dom'
 import { AuditPanel } from './components/AuditPanel'
 import { GstPanel } from './components/GstPanel'
 import { RecentInvoicesPanel, ReorderPanel, TopSellersPanel } from './components/DashboardLists'
+import { QuickActionsBar } from './components/QuickActionsBar'
 import { SalesTrendChart } from './components/SalesTrendChart'
 import { useDashboard } from './hooks'
 
@@ -23,26 +29,43 @@ function monthLabel(isoDate: string): string {
   return new Date(year, month - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 }
 
-/** Signed, coloured by direction — sales falling is the thing worth noticing, so it is not green. */
+/**
+ * Signed, in a tinted pill so the direction reads before the number does.
+ * <p>
+ * Sales falling is the thing worth noticing, so a fall is red rather than green — the pill grades
+ * the movement, which is the one place on this screen where colour is allowed to mean something.
+ * </p>
+ */
 function MonthDelta({ changePercent }: { changePercent: number | null }) {
   if (changePercent === null) {
-    return <>no sales last month</>
+    return <Box component="span">no sales last month</Box>
   }
 
   const up = changePercent >= 0
 
   return (
-    <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
-      <Box sx={{ display: 'flex', color: up ? 'success.dark' : 'error.dark' }}>
+    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+      <Stack
+        direction="row"
+        spacing={0.125}
+        sx={{
+          alignItems: 'center',
+          px: 0.625,
+          py: 0.125,
+          borderRadius: '5px',
+          bgcolor: up ? 'success.light' : 'error.light',
+          color: up ? 'success.dark' : 'error.dark',
+          fontWeight: 700,
+          fontSize: 11.5,
+        }}
+      >
         {up ? (
-          <ArrowUpwardIcon sx={{ fontSize: 14 }} />
+          <ArrowUpwardIcon sx={{ fontSize: 13 }} />
         ) : (
-          <ArrowDownwardIcon sx={{ fontSize: 14 }} />
+          <ArrowDownwardIcon sx={{ fontSize: 13 }} />
         )}
-      </Box>
-      <Box component="span" sx={{ color: up ? 'success.dark' : 'error.dark', fontWeight: 600 }}>
         {Math.abs(changePercent)}%
-      </Box>
+      </Stack>
       <Box component="span">vs last month</Box>
     </Stack>
   )
@@ -71,20 +94,30 @@ export function DashboardPage() {
   const money = data?.money
 
   return (
-    <Box>
-      <Box sx={{ mb: 2.5 }}>
-        <Typography variant="h1">Dashboard</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Where the shop stands today — trade, money owed, GST and the document checks.
-        </Typography>
-      </Box>
+    <Stack spacing={2}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={2}
+        sx={{ alignItems: { md: 'center' }, justifyContent: 'space-between' }}
+      >
+        <Box>
+          <Typography variant="h1">Dashboard</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+            Where the shop stands today — trade, money owed, GST and the document checks.
+          </Typography>
+        </Box>
+        <QuickActionsBar />
+      </Stack>
 
       {/* Every tile links through to the screen that explains it. A dashboard figure with no way
           in is a dead end. */}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
+      <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatTile
             label="Today's sales"
+            icon={<PointOfSaleOutlinedIcon />}
+            iconTone="blue"
+            tinted
             value={formatCurrency(today?.salesTotal ?? 0)}
             caption={plural(today?.invoiceCount ?? 0, 'invoice')}
             tone="primary"
@@ -95,6 +128,9 @@ export function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatTile
             label={`This month · ${month.split(' ')[0]}`}
+            icon={<ShowChartOutlinedIcon />}
+            iconTone="violet"
+            tinted
             value={formatCurrency(monthData?.salesTotal ?? 0)}
             caption={<MonthDelta changePercent={monthData?.changePercent ?? null} />}
             loading={isLoading}
@@ -104,6 +140,9 @@ export function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatTile
             label="Receivables"
+            icon={<CallReceivedIcon />}
+            iconTone="amber"
+            tinted
             value={formatCurrency(money?.receivable ?? 0)}
             caption={
               money && money.receivableOver60 > 0
@@ -127,6 +166,9 @@ export function DashboardPage() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <StatTile
             label="Payables"
+            icon={<CallMadeIcon />}
+            iconTone="rose"
+            tinted
             value={formatCurrency(money?.payable ?? 0)}
             caption={`${plural(money?.payableBillCount ?? 0, 'unpaid bill')} · ${plural(
               money?.suppliersWithDues ?? 0,
@@ -144,38 +186,63 @@ export function DashboardPage() {
         <Paper
           variant="outlined"
           onClick={() => navigate('/accounts/cheques')}
-          sx={{ p: 1.75, cursor: 'pointer', display: 'flex', gap: 1.25, alignItems: 'center' }}
+          sx={{
+            p: 1.5,
+            borderRadius: '10px',
+            cursor: 'pointer',
+            display: 'flex',
+            gap: 1.5,
+            alignItems: 'center',
+            borderColor: '#F8E4C4',
+            bgcolor: '#FFFDF8',
+            transition: 'background-color 120ms ease',
+            '&:hover': { bgcolor: '#FDF3E4' },
+          }}
         >
-          <AccountBalanceWalletOutlinedIcon sx={{ fontSize: 20, color: 'warning.dark' }} />
-          <Typography sx={{ fontSize: 13.5 }}>
+          <Box
+            sx={{
+              width: 30,
+              height: 30,
+              flexShrink: 0,
+              borderRadius: '8px',
+              display: 'grid',
+              placeItems: 'center',
+              bgcolor: '#FDF3E4',
+              color: 'warning.dark',
+            }}
+          >
+            <AccountBalanceWalletOutlinedIcon sx={{ fontSize: 17 }} />
+          </Box>
+          <Typography sx={{ fontSize: 13.5, flexGrow: 1 }}>
             <strong>{cheques.data.chequesInHandCount} cheque(s)</strong> worth{' '}
             {formatCurrency(cheques.data.chequesInHand)} are still in hand — open the register to
             bank or clear them.
           </Typography>
+          <ChevronRightIcon sx={{ fontSize: 19, color: 'text.disabled', flexShrink: 0 }} />
         </Paper>
       ) : null}
 
       {money && money.advancesHeld > 0 ? (
-        <Typography sx={{ fontSize: 12.5, color: 'text.secondary', mt: -1 }}>
+        <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
           {formatCurrency(money.advancesHeld)} held on account against no bill — shown separately,
           because one customer's advance does not settle another customer's debt.
         </Typography>
       ) : null}
 
-      <Box sx={{ mb: 2 }}>
-        <SalesTrendChart points={data?.salesTrend ?? []} loading={isLoading} />
-      </Box>
+      {/* One grid for every module below the tiles. Panels that share a row are the same height
+          because the shell stretches, not because their contents happen to match. */}
+      <Grid container spacing={2}>
+        <Grid size={12}>
+          <SalesTrendChart points={data?.salesTrend ?? []} loading={isLoading} />
+        </Grid>
 
-      <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid size={{ xs: 12, lg: 7 }}>
           {data?.gst && <GstPanel gst={data.gst} monthLabel={month} />}
         </Grid>
         <Grid size={{ xs: 12, lg: 5 }}>
           {data && <AuditPanel audit={data.audit} monthLabel={month} />}
         </Grid>
-      </Grid>
 
-      <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 4 }}>
           <ReorderPanel
             items={data?.reorder ?? []}
@@ -183,10 +250,7 @@ export function DashboardPage() {
           />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <TopSellersPanel
-            items={data?.topSellers ?? []}
-            onOpen={() => navigate('/billing/new')}
-          />
+          <TopSellersPanel items={data?.topSellers ?? []} onOpen={() => navigate('/billing/new')} />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <RecentInvoicesPanel
@@ -196,6 +260,6 @@ export function DashboardPage() {
           />
         </Grid>
       </Grid>
-    </Box>
+    </Stack>
   )
 }

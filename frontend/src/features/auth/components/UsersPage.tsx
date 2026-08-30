@@ -1,3 +1,6 @@
+import { describeError } from '@/lib/api/errors'
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined'
 import PersonAddAltOutlinedIcon from '@mui/icons-material/PersonAddAltOutlined'
 import {
@@ -24,7 +27,6 @@ import {
 import { useState } from 'react'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
-import { ApiError } from '@/lib/api/client'
 import { formatDate } from '@/lib/format'
 import { useAuth } from '../AuthProvider'
 import {
@@ -36,13 +38,8 @@ import {
   useUsers,
 } from '../hooks'
 
-/** Pulls the one sentence out of an API failure, whichever shape it came back in. */
-function message(caught: unknown, fallback: string) {
-  if (caught instanceof ApiError) {
-    return Object.values(caught.errors)[0]?.[0] ?? caught.message
-  }
-  return fallback
-}
+/** One sentence for the counter, whichever shape the failure came back in. */
+const message = describeError
 
 /**
  * Shown once, right after the server generates it. There is no second chance to read it, so it gets
@@ -207,22 +204,24 @@ export function UsersPage() {
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="body2" color="text.secondary">
-          Everyone who can sign in, and what each of them is allowed to do. Every document records
-          who created it, so this list is what the audit trail names.
-        </Typography>
-        {manages && (
-          <Button
-            variant="contained"
-            startIcon={<PersonAddAltOutlinedIcon />}
-            onClick={() => setAdding(true)}
-            sx={{ flexShrink: 0 }}
-          >
-            Add person
-          </Button>
-        )}
-      </Stack>
+      <PageHeader
+        title="People"
+        icon={<GroupsOutlinedIcon />}
+        iconTone="blue"
+        caption="Everyone who can sign in, and what each of them is allowed to do. Every document records who created it, so this list is what the audit trail names."
+        actions={
+          manages && (
+            <Button
+              variant="contained"
+              startIcon={<PersonAddAltOutlinedIcon />}
+              onClick={() => setAdding(true)}
+            >
+              Add person
+            </Button>
+          )
+        }
+        flush
+      />
 
       {oneTime && <OneTimePassword password={oneTime} onDone={() => setOneTime(null)} />}
 

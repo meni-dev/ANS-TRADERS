@@ -10,6 +10,8 @@ public record ProductDto(
     string? VehicleModel,
     string Hsn,
     decimal GstRate,
+    /// <summary>Taxable, NilRated, Exempt or NonGst — which GSTR-1 table this part belongs in.</summary>
+    string SupplyType,
     decimal CgstRate,
     decimal SgstRate,
     string Uqc,

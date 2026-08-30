@@ -28,4 +28,14 @@ public interface ICurrentUser
     /// </para>
     /// </summary>
     void Require(Permission permission, string action);
+
+    /// <summary>
+    /// Throws unless the caller holds at least one of <paramref name="permissions"/>.
+    /// <para>
+    /// For the screens more than one role has a reason to open. Whoever closes the day needs to see
+    /// the drawer; so does whoever reads the accounts. Requiring either is the honest rule, and
+    /// inventing a third permission for the overlap would be a checkbox nobody understands.
+    /// </para>
+    /// </summary>
+    void RequireAny(string action, params Permission[] permissions);
 }

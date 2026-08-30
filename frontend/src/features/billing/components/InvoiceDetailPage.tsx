@@ -1,14 +1,15 @@
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { BalanceChip, DocumentStatusChip } from '@/components/document/DocumentStatusChip'
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { useShopSettings } from '@/features/settings/hooks'
 import { formatDate } from '@/lib/format'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import BlockIcon from '@mui/icons-material/Block'
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
 import AssignmentReturnOutlinedIcon from '@mui/icons-material/AssignmentReturnOutlined'
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined'
-import { Alert, Box, Button, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, CircularProgress, Stack } from '@mui/material'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { templateComponent } from '../templates'
@@ -60,71 +61,72 @@ export function InvoiceDetailPage() {
 
   return (
     <Box>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', mb: 2.5 }} className="no-print">
-        <Tooltip title="Back to invoices">
-          <IconButton size="small" onClick={() => navigate('/billing')} sx={{ mt: 0.25 }}>
-            <ArrowBackIcon sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Tooltip>
-
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
-            <Typography variant="h1">{invoice.invoiceNumber}</Typography>
+      <PageHeader
+        title={invoice.invoiceNumber}
+        icon={<ReceiptLongOutlinedIcon />}
+        iconTone="blue"
+        badge={
+          <>
             <DocumentStatusChip status={invoice.status} />
             {!isCancelled && (
               <BalanceChip balanceDue={invoice.balanceDue} grandTotal={invoice.grandTotal} />
             )}
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          </>
+        }
+        caption={
+          <>
             {invoice.customerName} · {formatDate(invoice.invoiceDate)}
             {/* Only worth saying when it differs from the invoice date — otherwise it is noise. */}
             {invoice.dueDate && invoice.dueDate !== invoice.invoiceDate && invoice.balanceDue > 0
               ? ` · due ${formatDate(invoice.dueDate)}`
               : ''}
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={1}>
-          {/* The counter is standing here when the customer pays, so the receipt starts here. */}
-          {!isCancelled && invoice.balanceDue > 0 && can('PaymentRecord') && (
-            <Button
-              variant="contained"
-              startIcon={<PaymentsOutlinedIcon sx={{ fontSize: 18 }} />}
-              onClick={() => navigate('/accounts/payments/new')}
-            >
-              Record receipt
-            </Button>
-          )}
-          {/* Goods come back to the counter, not to a menu — so the return starts from the
-              document the customer is holding. */}
-          {!isCancelled && can('SalesReturn') && (
-            <Button
-              variant="outlined"
-              startIcon={<AssignmentReturnOutlinedIcon sx={{ fontSize: 18 }} />}
-              onClick={() => navigate(`/billing/${invoice.id}/return`)}
-            >
-              Return items
-            </Button>
-          )}
-          <Button
-            variant="outlined"
-            startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
-            onClick={() => window.print()}
-          >
-            Print
-          </Button>
-          {!isCancelled && can('BillCancel') && (
+          </>
+        }
+        onBack={() => navigate('/billing')}
+        className="no-print"
+        actions={
+          <Stack direction="row" spacing={1}>
+            {/* The counter is standing here when the customer pays, so the receipt starts here. */}
+            {!isCancelled && invoice.balanceDue > 0 && can('PaymentRecord') && (
+              <Button
+                variant="contained"
+                startIcon={<PaymentsOutlinedIcon sx={{ fontSize: 18 }} />}
+                onClick={() => navigate('/accounts/payments/new')}
+              >
+                Record receipt
+              </Button>
+            )}
+            {/* Goods come back to the counter, not to a menu — so the return starts from the
+                document the customer is holding. */}
+            {!isCancelled && can('SalesReturn') && (
+              <Button
+                variant="outlined"
+                startIcon={<AssignmentReturnOutlinedIcon sx={{ fontSize: 18 }} />}
+                onClick={() => navigate(`/billing/${invoice.id}/return`)}
+              >
+                Return items
+              </Button>
+            )}
             <Button
               variant="outlined"
-              color="error"
-              startIcon={<BlockIcon sx={{ fontSize: 18 }} />}
-              onClick={() => setConfirmOpen(true)}
+              startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
+              onClick={() => window.print()}
             >
-              Cancel
+              Print
             </Button>
-          )}
-        </Stack>
-      </Stack>
+            {!isCancelled && can('BillCancel') && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<BlockIcon sx={{ fontSize: 18 }} />}
+                onClick={() => setConfirmOpen(true)}
+              >
+                Cancel
+              </Button>
+            )}
+          </Stack>
+        }
+      />
 
       {isCancelled && (
         <Alert severity="warning" sx={{ mb: 2 }} className="no-print">

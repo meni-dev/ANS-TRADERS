@@ -1,5 +1,6 @@
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
+import { SUPPLY_TYPES } from '../types'
 import { FormSection } from '@/components/form/FormSection'
 import { RHFTextField } from '@/components/form/RHFTextField'
 import { Grid, InputAdornment, TextField } from '@mui/material'
@@ -11,6 +12,7 @@ export function ProductFormFields() {
   const { control, setValue, getValues } = useFormContext()
 
   const gstRate = useWatch({ control, name: 'gstRate' })
+  const supplyType = useWatch({ control, name: 'supplyType' })
   const vehicleBrand = useWatch({ control, name: 'vehicleBrand' })
 
   // CGST and SGST are always an even split of GST. They mirror what the server stores, so they
@@ -73,10 +75,20 @@ export function ProductFormFields() {
           </Grid>
 
           <Grid size={{ xs: 12, sm: 4 }}>
+            <RHFSelectField
+              name="supplyType"
+              label="Supply Type"
+              options={SUPPLY_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+              helperText="Nil rated and exempt goods are reported apart from taxable turnover"
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
             <RHFNumberField
               name="gstRate"
               label="GST Rate"
               required
+              disabled={supplyType !== 'Taxable'}
+              helperText={supplyType === 'Taxable' ? undefined : 'Untaxed goods carry no rate'}
               slotProps={{ input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }}
             />
           </Grid>

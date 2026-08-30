@@ -12,30 +12,48 @@ public class ExpenseService : IExpenseService
     private readonly IExpenseRepository _repository;
     private readonly IDashboardRepository _trading;
     private readonly IPeriodLock _periodLock;
+    private readonly ICashDayLock _cashDayLock;
     private readonly IAuditLog _audit;
     private readonly ICurrentUser _currentUser;
 
     private readonly IShopClock _clock;
 
+    private readonly IUnitOfWork _unitOfWork;
+
+    private readonly IDocumentNumbers _numbers;
+
     public ExpenseService(
         IExpenseRepository repository,
         IDashboardRepository trading,
         IPeriodLock periodLock,
+        ICashDayLock cashDayLock,
         IAuditLog audit,
         ICurrentUser currentUser,
-        IShopClock clock)
+        IShopClock clock,
+        IUnitOfWork unitOfWork,
+        IDocumentNumbers numbers)
     {
         _repository = repository;
         _trading = trading;
         _periodLock = periodLock;
+        _cashDayLock = cashDayLock;
         _audit = audit;
         _currentUser = currentUser;
         _clock = clock;
+        _unitOfWork = unitOfWork;
+        _numbers = numbers;
     }
 
+    /// <summary>
+    /// Guarded because the Salary rows are in here. Whoever records expenses obviously reads them,
+    /// and whoever reads the accounts does too — anybody else has no business knowing what the shop
+    /// pays its staff.
+    /// </summary>
     public async Task<PagedResult<ExpenseDto>> SearchAsync(
         ExpenseListQuery query, CancellationToken cancellationToken)
     {
+        _currentUser.RequireAny("see what the shop spends", Permission.ExpenseRecord, Permission.CostView);
+
         var (items, totalCount) = await _repository.SearchAsync(
             query.Search, ParseCategory(query.Category), query.FromDate, query.ToDate,
             query.Page, query.PageSize, cancellationToken);
@@ -47,56 +65,66 @@ public class ExpenseService : IExpenseService
     public async Task<ExpenseDto> CreateAsync(
         CreateExpenseRequest request, CancellationToken cancellationToken)
     {
-        _currentUser.Require(Permission.ExpenseRecord, "record an expense");
-
-        await _periodLock.GuardAsync(request.ExpenseDate, "expense", cancellationToken);
-
-        var amount = Round(request.Amount);
-
-        if (amount <= 0)
+        // The document number is claimed inside this transaction, so a create that fails
+        // rolls the number back with it rather than leaving a gap in the series.
+        return await _unitOfWork.InTransactionAsync(async () =>
         {
-            throw Invalid("Amount", "Enter what was spent");
-        }
+            _currentUser.Require(Permission.ExpenseRecord, "record an expense");
 
-        if (request.ExpenseDate > _clock.Today)
-        {
-            throw Invalid("ExpenseDate", "An expense cannot be dated in the future");
-        }
+            await _periodLock.GuardAsync(request.ExpenseDate, "expense", cancellationToken);
+            await _cashDayLock.GuardAsync(
+                request.ExpenseDate,
+                "expense",
+                string.Equals(request.Mode, "Cash", StringComparison.OrdinalIgnoreCase),
+                cancellationToken);
 
-        if (!Enum.TryParse<ExpenseCategory>(request.Category, ignoreCase: true, out var category))
-        {
-            throw Invalid("Category", "Pick what the money went on");
-        }
+            var amount = Round(request.Amount);
 
-        // Credit is not a way of paying. On a bill it means nothing was tendered, and an expense
-        // that tendered nothing did not happen.
-        if (!Enum.TryParse<PaymentMode>(request.Mode, ignoreCase: true, out var mode)
-            || mode == PaymentMode.Credit)
-        {
-            throw Invalid("Mode", "How was it paid?");
-        }
+            if (amount <= 0)
+            {
+                throw Invalid("Amount", "Enter what was spent");
+            }
 
-        var financialYear = FinancialYear.For(request.ExpenseDate);
-        var sequence = await _repository.GetLastSequenceAsync(financialYear, cancellationToken) + 1;
+            if (request.ExpenseDate > _clock.Today)
+            {
+                throw Invalid("ExpenseDate", "An expense cannot be dated in the future");
+            }
 
-        var expense = new Expense
-        {
-            ExpenseNumber = $"EXP/{financialYear}/{sequence:D4}",
-            FinancialYear = financialYear,
-            Sequence = sequence,
-            ExpenseDate = request.ExpenseDate,
-            Category = category,
-            Amount = amount,
-            Mode = mode,
-            ReferenceNumber = Clean(request.ReferenceNumber),
-            PaidTo = Clean(request.PaidTo),
-            Notes = Clean(request.Notes),
-        };
+            if (!Enum.TryParse<ExpenseCategory>(request.Category, ignoreCase: true, out var category))
+            {
+                throw Invalid("Category", "Pick what the money went on");
+            }
 
-        await _repository.AddAsync(expense, cancellationToken);
-        await _repository.SaveChangesAsync(cancellationToken);
+            // Credit is not a way of paying. On a bill it means nothing was tendered, and an expense
+            // that tendered nothing did not happen.
+            if (!Enum.TryParse<PaymentMode>(request.Mode, ignoreCase: true, out var mode)
+                || mode == PaymentMode.Credit)
+            {
+                throw Invalid("Mode", "How was it paid?");
+            }
 
-        return ToDto(expense);
+            var financialYear = FinancialYear.For(request.ExpenseDate);
+            var sequence = await _numbers.NextAsync(DocumentKind.Expense, financialYear, cancellationToken);
+
+            var expense = new Expense
+            {
+                ExpenseNumber = $"EXP/{financialYear}/{sequence:D4}",
+                FinancialYear = financialYear,
+                Sequence = sequence,
+                ExpenseDate = request.ExpenseDate,
+                Category = category,
+                Amount = amount,
+                Mode = mode,
+                ReferenceNumber = Clean(request.ReferenceNumber),
+                PaidTo = Clean(request.PaidTo),
+                Notes = Clean(request.Notes),
+            };
+
+            await _repository.AddAsync(expense, cancellationToken);
+            await _repository.SaveChangesAsync(cancellationToken);
+
+            return ToDto(expense);
+        }, cancellationToken);
     }
 
     public async Task CancelAsync(Guid id, CancellationToken cancellationToken)
@@ -112,7 +140,7 @@ public class ExpenseService : IExpenseService
 
         _currentUser.Require(Permission.ExpenseRecord, "cancel an expense");
 
-        await _periodLock.GuardAsync(expense.ExpenseDate, "expense", cancellationToken);
+        await _periodLock.GuardUndoAsync(expense.ExpenseDate, "expense", cancellationToken);
 
         // Flagged, never deleted — the number stays taken so the series has no hole in it.
         expense.IsCancelled = true;
@@ -132,6 +160,8 @@ public class ExpenseService : IExpenseService
     public async Task<ExpenseSummaryDto> GetSummaryAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
+        _currentUser.RequireAny("see what the shop spends", Permission.ExpenseRecord, Permission.CostView);
+
         var totals = await _repository.GetTotalsByCategoryAsync(fromDate, toDate, cancellationToken);
 
         return new ExpenseSummaryDto(

@@ -1,3 +1,6 @@
+import { describeError } from '@/lib/api/errors'
+import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { DocumentTotals } from '@/components/document/DocumentTotals'
 import { LineItemsEditor } from '@/components/document/LineItemsEditor'
 import { useNotification } from '@/components/feedback/NotificationProvider'
@@ -9,14 +12,12 @@ import { RHFTextField } from '@/components/form/RHFTextField'
 import { useShopSettings } from '@/features/settings/hooks'
 import { SupplierPicker } from '@/features/suppliers/components/SupplierPicker'
 import type { SupplierDto } from '@/features/suppliers/types'
-import { ApiError } from '@/lib/api/client'
 import { computeDocument, computeLine, isInterState as computeIsInterState } from '@/lib/documents/gst'
 import { emptyLine, PAYMENT_MODES, type DocumentLineValues } from '@/lib/documents/types'
 import { todayIso } from '@/lib/format'
 import { zodResolver } from '@hookform/resolvers/zod'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
-import { Alert, Box, Button, Chip, Grid, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, Grid, Paper, Stack, Tooltip, Typography } from '@mui/material'
 import { useState } from 'react'
 import { FormProvider, useForm, useWatch } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
@@ -83,28 +84,19 @@ export function PurchaseFormPage() {
       notify(`Purchase ${created.purchaseNumber} recorded`)
       navigate(`/purchases/${created.id}`, { replace: true })
     } catch (error) {
-      setServerError(
-        error instanceof ApiError ? error.message : 'Something went wrong. Please try again.',
-      )
+      setServerError(describeError(error, 'Something went wrong. Please try again.'))
     }
   })
 
   return (
     <Box>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start', mb: 2.5 }}>
-        <Tooltip title="Back to purchases">
-          <IconButton size="small" onClick={() => navigate('/purchases')} sx={{ mt: 0.25 }}>
-            <ArrowBackIcon sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Tooltip>
-
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <Typography variant="h1">Record Purchase</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Enter a supplier's bill. The purchase number is assigned when you save.
-          </Typography>
-        </Box>
-      </Stack>
+      <PageHeader
+        title="Record Purchase"
+        icon={<ShoppingCartOutlinedIcon />}
+        iconTone="violet"
+        caption="Enter a supplier's bill. The purchase number is assigned when you save."
+        onBack={() => navigate('/purchases')}
+      />
 
       <FormProvider {...form}>
         {/* noValidate hands validation to zod — see the note in CreateProductDialog. */}
@@ -139,7 +131,6 @@ export function PurchaseFormPage() {
                   label="Bill Date"
                   type="date"
                   required
-                  slotProps={{ inputLabel: { shrink: true } }}
                 />
               </Grid>
             </Grid>

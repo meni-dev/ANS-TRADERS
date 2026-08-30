@@ -1,8 +1,11 @@
 import { formatCurrency, formatQuantity } from '@/lib/format'
+import { PanelCard } from '@/components/data/PanelCard'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import {
   Box,
   Divider,
-  Paper,
   Stack,
   Table,
   TableBody,
@@ -67,26 +70,28 @@ export function GstPanel({ gst, monthLabel }: GstPanelProps) {
   const isCredit = gst.netPayable < 0
 
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '8px', height: '100%' }}>
-      <Typography variant="h3">GST — {monthLabel}</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, mb: 2 }}>
-        Cancelled documents excluded, as they are from the return.
-      </Typography>
-
+    <PanelCard
+      title={`GST — ${monthLabel}`}
+      icon={<ReceiptLongOutlinedIcon />}
+      iconTone="violet"
+      caption="Cancelled documents excluded, as they are from the return."
+    >
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} sx={{ mb: 2.5 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            sx={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              color: 'text.disabled',
-              mb: 1,
-            }}
-          >
-            Output — on sales
-          </Typography>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 1 }}>
+            <ArrowUpwardIcon sx={{ fontSize: 14, color: 'primary.dark' }} />
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                color: 'text.disabled',
+              }}
+            >
+              Output — on sales
+            </Typography>
+          </Stack>
           <Stack spacing={0.75}>
             <TaxRow label="Taxable value" value={gst.outputTaxable} muted />
             <TaxRow label="CGST" value={gst.outputCgst} />
@@ -103,18 +108,20 @@ export function GstPanel({ gst, monthLabel }: GstPanelProps) {
         </Box>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            sx={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              color: 'text.disabled',
-              mb: 1,
-            }}
-          >
-            Input — on purchases
-          </Typography>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mb: 1 }}>
+            <ArrowDownwardIcon sx={{ fontSize: 14, color: 'success.dark' }} />
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                color: 'text.disabled',
+              }}
+            >
+              Input — on purchases
+            </Typography>
+          </Stack>
           <Stack spacing={0.75}>
             <TaxRow label="Taxable value" value={gst.inputTaxable} muted />
             <TaxRow label="CGST" value={gst.inputCgst} />
@@ -221,6 +228,6 @@ export function GstPanel({ gst, monthLabel }: GstPanelProps) {
           </Table>
         </Box>
       )}
-    </Paper>
+    </PanelCard>
   )
 }

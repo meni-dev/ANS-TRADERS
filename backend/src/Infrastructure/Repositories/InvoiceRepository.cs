@@ -82,12 +82,6 @@ public class InvoiceRepository : IInvoiceRepository
         return (items, totalCount);
     }
 
-    public async Task<int> GetLastSequenceAsync(string financialYear, CancellationToken cancellationToken) =>
-        await _context.Invoices
-            .Where(i => i.FinancialYear == financialYear)
-            .Select(i => (int?)i.Sequence)
-            .MaxAsync(cancellationToken) ?? 0;
-
     public async Task AddAsync(Invoice invoice, CancellationToken cancellationToken) =>
         await _context.Invoices.AddAsync(invoice, cancellationToken);
 

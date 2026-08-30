@@ -1,9 +1,9 @@
+import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { FormSection } from '@/components/form/FormSection'
 import { RHFSwitch } from '@/components/form/RHFSwitch'
-import { ApiError } from '@/lib/api/client'
 import { zodResolver } from '@hookform/resolvers/zod'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Typography } from '@mui/material'
@@ -63,11 +63,7 @@ export function EditCustomerDialog({ customer, onClose }: EditCustomerDialogProp
       notify(`Customer "${values.name}" updated`)
       onClose()
     } catch (error) {
-      if (error instanceof ApiError) {
-        setServerError(error.message)
-      } else {
-        setServerError('Something went wrong. Please try again.')
-      }
+      setServerError(describeError(error, 'Something went wrong. Please try again.'))
     }
   })
 

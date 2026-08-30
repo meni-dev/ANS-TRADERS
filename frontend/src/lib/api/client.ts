@@ -42,11 +42,20 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (options.body) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const response = await fetch(buildUrl(path, options.params), {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  })
+  let response: Response
+
+  try {
+    response = await fetch(buildUrl(path, options.params), {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    })
+  } catch {
+    // A dead connection throws a TypeError with a message written for whoever wrote the browser.
+    // Turning it into an ApiError here means every screen handles "the shop is offline" through
+    // the same path as every other failure, instead of falling through to a generic catch.
+    throw new ApiError(0, 'Cannot reach the server', 'NETWORK_UNREACHABLE')
+  }
 
   // Handled once here rather than in every screen: a dead token makes every query fail at the same
   // moment, and without this each one would surface its own error toast behind a page the user can

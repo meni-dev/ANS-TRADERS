@@ -18,6 +18,13 @@ public class StockRepository : IStockRepository
     public async Task AddMovementAsync(StockMovement movement, CancellationToken cancellationToken) =>
         await _context.StockMovements.AddAsync(movement, cancellationToken);
 
+    public async Task<decimal> GetBalanceOnAsync(
+        Guid productId, DateOnly onDate, CancellationToken cancellationToken) =>
+        await _context.StockMovements
+            .AsNoTracking()
+            .Where(m => m.ProductId == productId && m.MovementDate <= onDate)
+            .SumAsync(m => (decimal?)m.Quantity, cancellationToken) ?? 0m;
+
     public async Task<(IReadOnlyList<Product> Items, int TotalCount)> SearchStockAsync(
         string? search, bool? lowOnly, bool? activeOnly, int page, int pageSize, CancellationToken cancellationToken)
     {
@@ -83,18 +90,18 @@ public class StockRepository : IStockRepository
             query = query.Where(m => m.MovementType == type);
         }
 
+        // Filtered on the document's date, not on when the row was written. A bill dated the 5th
+        // and keyed on the 20th belongs in the 5th's register — otherwise this register and the
+        // sales register disagree about the week the shelf emptied. No timezone arithmetic either:
+        // MovementDate is already a shop day.
         if (fromDate is { } from)
         {
-            var fromUtc = new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-            query = query.Where(m => m.MovedAt >= fromUtc);
+            query = query.Where(m => m.MovementDate >= from);
         }
 
         if (toDate is { } to)
         {
-            // Exclusive upper bound on the next day, so a movement at 23:59 on the end date is not
-            // silently dropped the way `<= midnight` would drop it.
-            var toUtc = new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-            query = query.Where(m => m.MovedAt < toUtc);
+            query = query.Where(m => m.MovementDate <= to);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -109,7 +116,10 @@ public class StockRepository : IStockRepository
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .OrderByDescending(m => m.MovedAt)
+            // Newest day first, and within a day the order the rows were written — which is the
+            // order the counter did them in.
+            .OrderByDescending(m => m.MovementDate)
+            .ThenByDescending(m => m.MovedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -230,15 +240,12 @@ public class StockRepository : IStockRepository
     public async Task<IReadOnlyList<(StockAdjustmentReason Reason, decimal Quantity, decimal Value)>>
         GetAdjustmentsAsync(DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
-        var fromUtc = fromDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var toUtc = toDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-
         var rows = await (
             from movement in _context.StockMovements.AsNoTracking()
             join product in _context.Products.AsNoTracking() on movement.ProductId equals product.Id
             where movement.MovementType == StockMovementType.Adjustment
                   && movement.AdjustmentReason != null
-                  && movement.MovedAt >= fromUtc && movement.MovedAt < toUtc
+                  && movement.MovementDate >= fromDate && movement.MovementDate <= toDate
             select new { movement.AdjustmentReason, movement.Quantity, product.PurchaseRate })
             .ToListAsync(cancellationToken);
 

@@ -37,6 +37,20 @@ public class User : AuditableEntity
     public DateTimeOffset? LastSignedInAt { get; set; }
 
     /// <summary>
+    /// Wrong passwords in a row. Reset the moment one works.
+    /// </summary>
+    public int FailedSignInCount { get; set; }
+
+    /// <summary>
+    /// Set once the failures pass the limit, and the account refuses to sign in until it passes.
+    /// <para>
+    /// Held on the row rather than in memory because the API runs as several copies at once on
+    /// Lambda — a counter kept in one process would let an attacker simply spread the guesses.
+    /// </para>
+    /// </summary>
+    public DateTimeOffset? LockedOutUntil { get; set; }
+
+    /// <summary>
     /// Deactivated rather than deleted. Their name is on documents going back years, and a foreign
     /// key that dangles is worse than an account that cannot sign in.
     /// </summary>

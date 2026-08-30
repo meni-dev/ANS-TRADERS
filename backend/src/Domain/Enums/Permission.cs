@@ -47,6 +47,12 @@ public enum Permission
     ExpenseRecord,
     CashDayClose,
 
+    /// <summary>
+    /// Moving money between the bank and the till, and recording what the owner put in or took out.
+    /// Its own permission because it is the owner's money, not the shop's trade.
+    /// </summary>
+    CapitalMovement,
+
     // ------------------------------------------------- The sensitive numbers
     /// <summary>
     /// Buying price, margin, profit. The counter needs none of it to sell a part, and this is the

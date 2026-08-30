@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Enums;
 
 namespace Domain.Entities;
 
@@ -12,6 +13,12 @@ public class Product : AuditableEntity
     public string? VehicleModel { get; set; }
     public string Hsn { get; set; } = string.Empty;
     public decimal GstRate { get; set; }
+
+    /// <summary>
+    /// Which GSTR-1 table this part belongs in. Taxable for almost everything; the others exist
+    /// because a rate of zero alone cannot say whether goods are nil rated, exempt or outside GST.
+    /// </summary>
+    public SupplyType SupplyType { get; set; } = SupplyType.Taxable;
 
     /// <summary>Half of <see cref="GstRate"/>. Derived server-side, never accepted from the client.</summary>
     public decimal CgstRate { get; set; }

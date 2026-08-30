@@ -10,7 +10,7 @@ namespace UnitTests;
 public class ApplyCreditTests
 {
     private static PaymentLedger Ledger() =>
-        new(new FakePaymentRepository(), new PartyLedger(new FakePartyLedgerRepository()));
+        new(new FakePaymentRepository(), new PartyLedger(new FakePartyLedgerRepository()), new CountingNumbers());
 
     private static Invoice Billed(decimal total, decimal paid) => new()
     {

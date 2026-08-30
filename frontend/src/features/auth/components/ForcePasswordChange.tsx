@@ -1,6 +1,6 @@
+import { describeError } from '@/lib/api/errors'
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useState } from 'react'
-import { ApiError } from '@/lib/api/client'
 import { useAuth } from '../AuthProvider'
 import { useChangePassword } from '../hooks'
 
@@ -23,16 +23,25 @@ export function ForcePasswordChange() {
       await changePassword.mutateAsync({ currentPassword: current, newPassword: next })
       await refresh()
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? Object.values(caught.errors)[0]?.[0] ?? caught.message
-          : 'Could not reach the server',
-      )
+      setError(describeError(caught, 'Could not reach the server'))
     }
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: 'background.default', p: 2 }}>
+    // Anchored, not centred — see the note on the sign-in card. Same reason: the error must grow
+    // the card downward rather than shift the fields somebody is typing into.
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        pt: { xs: 6, sm: '16vh' },
+        pb: 6,
+        px: 2,
+        bgcolor: 'background.default',
+      }}
+    >
       <Paper sx={{ width: '100%', maxWidth: 420, p: 4 }}>
         <Stack spacing={2.5} component="form" onSubmit={submit}>
           <Box>

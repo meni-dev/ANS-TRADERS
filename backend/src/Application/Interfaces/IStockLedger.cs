@@ -19,6 +19,8 @@ public interface IStockLedger
         Product product,
         decimal signedQuantity,
         StockMovementType movementType,
+        /// <summary>The document's own date — see <see cref="StockMovement.MovementDate"/>.</summary>
+        DateOnly movementDate,
         Guid? referenceId,
         string? referenceNumber,
         string? notes,
@@ -37,4 +39,36 @@ public interface IStockLedger
     /// </para>
     /// </summary>
     void EnsureAvailable(Product product, decimal quantity, string action = "bill");
+
+    /// <summary>
+    /// Throws when undoing a document would take more off the shelf than is still on it.
+    /// <para>
+    /// Cancelling a purchase, or cancelling a credit note, both put a document into reverse and
+    /// take stock back out. If the goods have since been sold on there is nothing left to take, and
+    /// the reversal would leave a negative quantity on the shelf — a figure that is not wrong by a
+    /// rounding but wrong in kind, and that then values the stock at a negative number.
+    /// </para>
+    /// <para>
+    /// It refuses rather than clamping, because the arithmetic is telling the truth: goods that were
+    /// sold really did arrive, so the document being cancelled describes something that happened.
+    /// <paramref name="undoing"/> names the document so the message can say which one.
+    /// </para>
+    /// </summary>
+    void EnsureReversible(Product product, decimal quantity, string undoing, string remedy);
+
+    /// <summary>
+    /// Throws when the shelf could not have covered <paramref name="quantity"/> on
+    /// <paramref name="onDate"/>.
+    /// <para>
+    /// <see cref="EnsureAvailable"/> asks about today, which is the right question for a document
+    /// dated today and the wrong one for a back-dated bill: back-date it to a week the shelf was
+    /// empty and today's stock waves it through, leaving the books showing goods sold before they
+    /// arrived. Replaying this shop's own movements in document-date order found six such lines.
+    /// </para>
+    /// <para>
+    /// A document dated today takes the cheap path — the common case does not pay for the query.
+    /// </para>
+    /// </summary>
+    Task EnsureAvailableOnAsync(
+        Product product, decimal quantity, DateOnly onDate, string action, CancellationToken cancellationToken);
 }

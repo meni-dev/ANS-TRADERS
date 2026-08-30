@@ -15,16 +15,47 @@ public class ProductImportService : IProductImportService
     private readonly IValidator<CreateProductRequest> _productValidator;
     private readonly ICurrentUser _currentUser;
 
+    private readonly IShopClock _clock;
+    private readonly IShopSettingsRepository _settings;
+    private readonly IAuditLog _audit;
+
+    /// <summary>
+    /// The day a shop's opening figures belong on: the day its books begin.
+    /// <para>
+    /// This used to be the day somebody typed the part in, which is a different thing entirely. A
+    /// shop that keys its catalogue in August and then back-dates April's bills ends up with every
+    /// sale sitting <em>before</em> the stock it sold — the shelf reads negative for four months and
+    /// a year-end valuation is nonsense. Opening stock is what was there when the books opened, so
+    /// that is the date it carries.
+    /// </para>
+    /// <para>
+    /// A shop that has not said when its books begin has nothing better to offer than today.
+    /// </para>
+    /// </summary>
+    private async Task<DateOnly> OpeningDateAsync(CancellationToken cancellationToken)
+    {
+        var settings = await _settings.GetAsync(cancellationToken);
+
+        return settings.BooksStartFrom is { } start && start <= _clock.Today ? start : _clock.Today;
+    }
+
+
     public ProductImportService(
         IProductRepository repository,
         IStockLedger stockLedger,
         IValidator<CreateProductRequest> productValidator,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        IShopClock clock,
+        IShopSettingsRepository settings,
+        IAuditLog audit)
     {
         _repository = repository;
         _stockLedger = stockLedger;
         _productValidator = productValidator;
         _currentUser = currentUser;
+        _clock = clock;
+        _settings = settings;
+        _audit = audit;
     }
 
     // Preview reads nothing it does not already have permission to write, but it is gated all the
@@ -72,6 +103,10 @@ public class ProductImportService : IProductImportService
         var created = 0;
         var updated = 0;
 
+        // Read once, not per row: three thousand parts arriving in one file all opened on the same
+        // day, and that day is the books' start, not the moment the upload finished.
+        var openingDate = await OpeningDateAsync(cancellationToken);
+
         foreach (var row in examined)
         {
             if (row.Existing is { } existing)
@@ -90,7 +125,7 @@ public class ProductImportService : IProductImportService
             if (row.Parsed!.OpeningStock != 0)
             {
                 await _stockLedger.RecordAsync(
-                    product, row.Parsed.OpeningStock, StockMovementType.Opening,
+                    product, row.Parsed.OpeningStock, StockMovementType.Opening, openingDate,
                     null, "Catalogue import", notes: null, cancellationToken);
             }
 
@@ -98,6 +133,15 @@ public class ProductImportService : IProductImportService
         }
 
         // One save for the whole file — the atomicity above is only real because of this.
+        // One action can reprice every part in the shop. It left no trace at all, which
+        // made the catalogue the one thing nobody could ask a question about later.
+        await _audit.RecordAsync(
+            AuditAction.CatalogueImported,
+            "Product",
+            entityId: null,
+            entityLabel: null,
+            $"{created} added, {updated} updated from {examined.Count} rows",
+            cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
         return new ProductImportResultDto(created, updated);
@@ -208,6 +252,10 @@ public class ProductImportService : IProductImportService
             NullIfBlank(row.VehicleModel),
             Clean(row.Hsn),
             gstRate.Value,
+            // The import has no column for it, so everything comes in taxable. A shop selling
+            // nil-rated goods sets those few by hand; guessing from a zero rate would be wrong as
+            // often as it was right.
+            null,
             Clean(row.Uqc),
             purchaseRate.Value,
             sellingRate.Value,

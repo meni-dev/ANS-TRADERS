@@ -26,6 +26,9 @@ public record StockMovementDto(
     string MovementType,
     decimal Quantity,
     decimal BalanceAfter,
+    /// <summary>The day the goods moved, from the document that moved them. What the screen shows.</summary>
+    DateOnly MovementDate,
+    /// <summary>When the row was written. Audit only — see <see cref="MovementDate"/>.</summary>
     DateTimeOffset MovedAt,
     Guid? ReferenceId,
     string? ReferenceNumber,

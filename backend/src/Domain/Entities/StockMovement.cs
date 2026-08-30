@@ -30,6 +30,18 @@ public class StockMovement : Entity
     /// <summary>Stock on hand immediately after this movement. Makes the ledger readable on its own.</summary>
     public decimal BalanceAfter { get; set; }
 
+    /// <summary>
+    /// The day the goods actually moved, taken from the document that moved them.
+    /// <para>
+    /// Not the same question as <see cref="MovedAt"/>, and the difference is the whole point. A
+    /// bill dated the 5th keyed in on the 20th moved goods on the 5th; the row was written on the
+    /// 20th. Every register that asks "what happened in this period" reads this, so the stock
+    /// register and the sales register can agree about when the shelf emptied.
+    /// </para>
+    /// </summary>
+    public DateOnly MovementDate { get; set; }
+
+    /// <summary>When the row was written. An audit timestamp — see <see cref="MovementDate"/>.</summary>
     public DateTimeOffset MovedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>The purchase or invoice that caused the movement. Null for opening and adjustments.</summary>

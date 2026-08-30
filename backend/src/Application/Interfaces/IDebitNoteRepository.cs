@@ -18,7 +18,6 @@ public interface IDebitNoteRepository
         CancellationToken cancellationToken);
 
     /// <summary>Highest sequence used in the given financial year, or 0. Its own series.</summary>
-    Task<int> GetLastSequenceAsync(string financialYear, CancellationToken cancellationToken);
 
     /// <summary>Every sequence used in a year, for the dashboard's gap check.</summary>
     Task<IReadOnlyList<int>> GetSequencesAsync(string financialYear, CancellationToken cancellationToken);

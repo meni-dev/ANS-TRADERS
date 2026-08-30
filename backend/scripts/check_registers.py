@@ -98,10 +98,18 @@ check("expenses: total matches the expenses table", total(d, "amount") == D(db[0
       f"{total(d,'amount')} vs {db[0]}")
 
 d = reg("outstanding")
-db = sql("""SELECT coalesce(sum(GREATEST("OutstandingBalance",0)),0) FROM customers""")[0]
-db2 = sql("""SELECT coalesce(sum(GREATEST("OutstandingBalance",0)),0) FROM suppliers""")[0]
-check("outstanding: receivable matches customers", total(d, "receivable") == D(db[0]), f"{total(d,'receivable')} vs {db[0]}")
-check("outstanding: payable matches suppliers", total(d, "payable") == D(db2[0]), f"{total(d,'payable')} vs {db2[0]}")
+
+# Both columns take from both sides of the book. A customer sitting on a credit note is money the
+# shop owes back, so it belongs in payable; a supplier the shop has overpaid belongs in receivable.
+# Comparing payable against suppliers alone passed only for as long as no customer held a credit.
+db = sql("""SELECT coalesce((SELECT sum(GREATEST("OutstandingBalance",0)) FROM customers),0)
+                 + coalesce((SELECT sum(GREATEST(-"OutstandingBalance",0)) FROM suppliers),0)""")[0]
+db2 = sql("""SELECT coalesce((SELECT sum(GREATEST("OutstandingBalance",0)) FROM suppliers),0)
+                  + coalesce((SELECT sum(GREATEST(-"OutstandingBalance",0)) FROM customers),0)""")[0]
+check("outstanding: receivable is what customers owe plus what suppliers hold of the shop's",
+      total(d, "receivable") == D(db[0]), f"{total(d,'receivable')} vs {db[0]}")
+check("outstanding: payable is what the shop owes suppliers plus the credits customers hold",
+      total(d, "payable") == D(db2[0]), f"{total(d,'payable')} vs {db2[0]}")
 
 d = reg("stock-valuation")
 db = sql("""SELECT coalesce(sum("StockOnHand"),0), coalesce(sum(round("StockOnHand"*"PurchaseRate",2)),0)
@@ -122,9 +130,32 @@ check("stock-movement: in and out match the movements table",
 
 # ---------------------------------------------------------------- GST cross-checks
 sales, b2b, b2cs, hsn, cdnr = reg("sales"), reg("gstr1-b2b"), reg("gstr1-b2cs"), reg("gstr1-hsn"), reg("gstr1-cdnr")
-check("GSTR-1: B2B + B2C taxable equals the sales register",
-      total(b2b, "taxable") + total(b2cs, "taxable") == total(sales, "taxable"),
-      f"{total(b2b,'taxable')} + {total(b2cs,'taxable')} vs {total(sales,'taxable')}")
+b2cl, nil = reg("gstr1-b2cl"), reg("gstr1-nil")
+
+untaxed = sum(D(str(t["value"])) for t in nil["totals"])
+
+check("GSTR-1: B2B + B2C Large + B2C Small + Table 8 equals the sales register",
+      total(b2b, "taxable") + total(b2cl, "taxable") + total(b2cs, "taxable") + untaxed
+      == total(sales, "taxable"),
+      f"{total(b2b,'taxable')} + {total(b2cl,'taxable')} + {total(b2cs,'taxable')} + {untaxed}"
+      f" vs {total(sales,'taxable')}")
+
+# A large inter-state B2C bill belongs in exactly one of the two, never both.
+b2cl_numbers = {r[b2cl["idx"]["number"]] for r in b2cl["rows"]}
+check("GSTR-1: nothing sits in both B2C Large and B2B",
+      not (b2cl_numbers & {r[b2b["idx"]["number"]] for r in b2b["rows"]}),
+      "an invoice appears in both tables")
+
+docs = reg("gstr1-docs")
+sales_row = [r for r in docs["rows"] if "outward supply" in r[docs["idx"]["nature"]]]
+if sales_row:
+    r = sales_row[0]
+    check("Table 13: the invoice count matches the sales register",
+          int(r[docs["idx"]["total"]]) == sales["rowCount"],
+          f"{r[docs['idx']['total']]} vs {sales['rowCount']}")
+    check("Table 13: net issued is total less cancelled",
+          int(r[docs["idx"]["net"]]) == int(r[docs["idx"]["total"]]) - int(r[docs["idx"]["cancelled"]]),
+          "the three do not agree")
 check("GSTR-1: HSN taxable equals the sales register",
       total(hsn, "taxable") == total(sales, "taxable"),
       f"{total(hsn,'taxable')} vs {total(sales,'taxable')}")
@@ -229,6 +260,73 @@ for key, col in [("sales", "date"), ("purchase", "date"), ("sales-returns", "dat
     off = [r[d["idx"][col]] for r in d["rows"] if not (FROM <= r[d["idx"][col]] <= TO)]
     check(f"{key}: every row falls inside the range asked for", not off, f"{off[:3]}")
 
+# The one check that is not about a register at all: does every carried total still agree with the
+# ledger it was built from? The dashboard already asks this, but the dashboard is a screen somebody
+# has to look at — and this script is what runs before a quarter goes to the accountant.
+#
+# It caught a real drift: probe documents deleted straight from the database took their ledger rows
+# with them and left two parties' carried balances behind. Nothing in the registers noticed, because
+# every register agreed with the same wrong number.
+drift = sql("""
+  SELECT 'customer ' || c."Name",
+         c."OutstandingBalance" - COALESCE((SELECT SUM(l."Amount") FROM party_ledger_entries l
+                                            WHERE l."CustomerId" = c."Id"), 0)
+  FROM customers c
+  WHERE c."OutstandingBalance" <> COALESCE((SELECT SUM(l."Amount") FROM party_ledger_entries l
+                                            WHERE l."CustomerId" = c."Id"), 0)
+  UNION ALL
+  SELECT 'supplier ' || s."Name",
+         s."OutstandingBalance" - COALESCE((SELECT SUM(l."Amount") FROM party_ledger_entries l
+                                            WHERE l."SupplierId" = s."Id"), 0)
+  FROM suppliers s
+  WHERE s."OutstandingBalance" <> COALESCE((SELECT SUM(l."Amount") FROM party_ledger_entries l
+                                            WHERE l."SupplierId" = s."Id"), 0)
+""")
+check("party balances still agree with their ledgers", not drift,
+      "; ".join(f"{r[0]} is out by {r[1]}" for r in drift[:3]))
+
+stock_drift = sql("""
+  SELECT p."PartNumber",
+         p."StockOnHand" - COALESCE((SELECT SUM(m."Quantity") FROM stock_movements m
+                                     WHERE m."ProductId" = p."Id"), 0)
+  FROM products p
+  WHERE p."StockOnHand" <> COALESCE((SELECT SUM(m."Quantity") FROM stock_movements m
+                                     WHERE m."ProductId" = p."Id"), 0)
+""")
+check("stock on hand still agrees with the movements behind it", not stock_drift,
+      "; ".join(f"{r[0]} is out by {r[1]}" for r in stock_drift[:3]))
+
+doc_drift = sql("""
+  SELECT "InvoiceNumber", ROUND("GrandTotal" - "AmountPaid" - "CreditAppliedAmount" - "BalanceDue", 2)
+  FROM invoices
+  WHERE "Status" <> 'Cancelled'
+    AND ROUND("GrandTotal" - "AmountPaid" - "CreditAppliedAmount", 2) <> ROUND("BalanceDue", 2)
+""")
+check("every open bill still balances three ways", not doc_drift,
+      "; ".join(f"{r[0]} is out by {r[1]}" for r in doc_drift[:3]))
+
+# The question an auditor opens the stock file with: was the shelf ever negative? A shelf cannot
+# hold less than nothing, so a day where it did means a bill is dated before the goods arrived —
+# either the date is wrong or a purchase has not been entered. Replayed in document-date order,
+# which is the order the books say things happened in.
+ever_negative = sql("""
+  WITH running AS (
+    SELECT p."PartNumber", m."MovementDate",
+           SUM(m."Quantity") OVER (PARTITION BY m."ProductId"
+                                   ORDER BY m."MovementDate",
+                                            CASE WHEN m."Quantity" > 0 THEN 0 ELSE 1 END,
+                                            m."MovedAt") AS balance
+    FROM stock_movements m JOIN products p ON p."Id" = m."ProductId"
+  )
+  SELECT "PartNumber", MIN("MovementDate")::text, MIN(balance)::text
+  FROM running WHERE balance < 0 GROUP BY "PartNumber" ORDER BY 1
+""")
+# Reported, not failed. Every other check here asks whether the app agrees with itself, and a
+# disagreement there is a defect. This one asks whether the shop's own history makes sense, and the
+# answer is a data correction only the shop can make — so it is surfaced every run rather than
+# turned into a red light that would be switched off within a week.
+notes = [f"{r[0]} first went negative on {r[1]}, down to {r[2]}" for r in ever_negative]
+
 for line in ok:
     print("  ok    ", line)
 
@@ -238,6 +336,23 @@ if bad:
     print(f"{len(bad)} CHECK(S) FAILED - the registers do not agree with the books:")
     for line in bad:
         print("  FAIL  ", line)
+
+    if notes:
+        print()
+        print("WORTH KNOWING — the books are consistent, but the history is not:")
+        for line in notes:
+            print("  !     ", line)
+
     raise SystemExit(1)
 
 print(f"All {len(ok)} checks passed. Every register agrees with the data behind it.")
+
+if notes:
+    print()
+    print("WORTH KNOWING — the books are consistent, but the history is not:")
+    for line in notes:
+        print("  !     ", line)
+    print()
+    print("  A shelf cannot hold less than nothing. Each of these is a bill dated before the goods")
+    print("  arrived — either the bill's date is wrong, or the purchase that brought them in has")
+    print("  not been entered. New ones are refused; these were recorded before that rule existed.")

@@ -1,10 +1,11 @@
+import { describeError } from '@/lib/api/errors'
+import AssignmentReturnOutlinedIcon from '@mui/icons-material/AssignmentReturnOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { PrintStyles } from '@/features/billing/templates/PrintStyles'
 import { useShopSettings } from '@/features/settings/hooks'
-import { ApiError } from '@/lib/api/client'
 import { formatCurrency, formatDate } from '@/lib/format'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import BlockIcon from '@mui/icons-material/Block'
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined'
 import {
@@ -13,7 +14,6 @@ import {
   Button,
   Chip,
   Divider,
-  IconButton,
   Paper,
   Stack,
   Table,
@@ -83,7 +83,7 @@ export function ReturnNoteDetailPage({ side }: ReturnNoteDetailPageProps) {
       notify(`${number} cancelled`, 'success')
       setConfirmOpen(false)
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not cancel this note')
+      setError(describeError(caught, 'Could not cancel this note'))
     }
   }
 
@@ -91,34 +91,36 @@ export function ReturnNoteDetailPage({ side }: ReturnNoteDetailPageProps) {
     <Stack spacing={2}>
       <PrintStyles page="A4" />
 
-      <Stack direction="row" spacing={1.5} className="no-print" sx={{ alignItems: 'center' }}>
-        <IconButton onClick={() => navigate(-1)} aria-label="Back">
-          <ArrowBackIcon />
-        </IconButton>
-        <Stack direction="row" spacing={1} sx={{ flex: 1, alignItems: 'center' }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            {number}
-          </Typography>
-          {isCancelled ? <Chip size="small" label="Cancelled" /> : null}
-        </Stack>
-        <Button
-          variant="outlined"
-          startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
-          onClick={() => window.print()}
-        >
-          Print
-        </Button>
-        {!isCancelled ? (
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<BlockIcon sx={{ fontSize: 18 }} />}
-            onClick={() => setConfirmOpen(true)}
-          >
-            Cancel
-          </Button>
-        ) : null}
-      </Stack>
+      <PageHeader
+        title={number}
+        icon={<AssignmentReturnOutlinedIcon />}
+        iconTone="rose"
+        badge={isCancelled ? <Chip size="small" label="Cancelled" /> : null}
+        onBack={() => navigate(-1)}
+        className="no-print"
+        actions={
+          <>
+            <Button
+              variant="outlined"
+              startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
+              onClick={() => window.print()}
+            >
+              Print
+            </Button>
+            {!isCancelled ? (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<BlockIcon sx={{ fontSize: 18 }} />}
+                onClick={() => setConfirmOpen(true)}
+              >
+                Cancel
+              </Button>
+            ) : null}
+          </>
+        }
+        flush
+      />
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 

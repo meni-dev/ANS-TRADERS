@@ -35,6 +35,8 @@ public static class DependencyInjection
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IDocumentNumbers, DocumentNumbers>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<ISupplierRepository, SupplierRepository>();
@@ -48,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IPartyLedgerRepository, PartyLedgerRepository>();
         services.AddScoped<IExpenseRepository, ExpenseRepository>();
         services.AddScoped<ICashRepository, CashRepository>();
+        services.AddScoped<IMoneyMovementRepository, MoneyMovementRepository>();
         services.AddScoped<ICreditNoteRepository, CreditNoteRepository>();
         services.AddScoped<IDebitNoteRepository, DebitNoteRepository>();
         services.AddScoped<Backfill.PaymentsBackfill>();

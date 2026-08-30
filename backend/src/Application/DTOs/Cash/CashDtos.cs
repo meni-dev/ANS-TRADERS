@@ -13,6 +13,10 @@ public record CashPositionDto(
     decimal CashReceived,
     decimal CashPaidOut,
     decimal CashExpenses,
+    /// <summary>Float, bank withdrawals, capital — cash that arrived without a sale behind it.</summary>
+    decimal CashOtherIn,
+    /// <summary>Banked, and drawings.</summary>
+    decimal CashOtherOut,
     decimal ExpectedCash,
     /// <summary>False when the previous day was never closed, so the opening figure is a guess.</summary>
     bool OpeningIsCarriedForward,
@@ -34,6 +38,10 @@ public record DayCloseDto(
     decimal CashReceived,
     decimal CashPaidOut,
     decimal CashExpenses,
+    /// <summary>Float, bank withdrawals, capital — cash that arrived without a sale behind it.</summary>
+    decimal CashOtherIn,
+    /// <summary>Banked, and drawings.</summary>
+    decimal CashOtherOut,
     decimal ExpectedCash,
     decimal CountedCash,
     decimal Difference,

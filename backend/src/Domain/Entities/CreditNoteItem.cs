@@ -1,5 +1,7 @@
 using Domain.Common;
 
+using Domain.Enums;
+
 namespace Domain.Entities;
 
 /// <summary>
@@ -45,6 +47,17 @@ public class CreditNoteItem : Entity
     public decimal GrossAmount { get; set; }
     public decimal TaxableAmount { get; set; }
     public decimal GstRate { get; set; }
+
+    /// <summary>
+    /// Copied from the line being credited, not read back from the product master.
+    /// <para>
+    /// A rate of zero cannot say on its own what kind of supply it is — a taxable part priced at
+    /// nothing and a nil-rated one both read 0. GSTR-1 Table 8 and GSTR-3B 3.1(c) need to know
+    /// which, so the answer travels with the note the way it already travels with the bill.
+    /// </para>
+    /// </summary>
+    public SupplyType SupplyType { get; set; }
+
     public decimal CgstAmount { get; set; }
     public decimal SgstAmount { get; set; }
     public decimal IgstAmount { get; set; }

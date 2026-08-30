@@ -21,14 +21,19 @@ public class AuditLog : IAuditLog
         Guid? entityId,
         string? entityLabel,
         string? detail,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        string? actedBy = null) =>
         _repository.AddAuditAsync(
             new AuditEvent
             {
                 UserId = _currentUser.UserId,
                 // Snapshotted, and "system" when nobody is signed in — the seeder and the backfill
                 // command both write without a session, and a blank name reads as a bug.
-                UserName = string.IsNullOrWhiteSpace(_currentUser.Name) ? "system" : _currentUser.Name,
+                //
+                // actedBy wins when it is given: at sign-in the person is known but has no session
+                // yet, and a trail that says "system signed in" names nobody.
+                UserName = actedBy
+                    ?? (string.IsNullOrWhiteSpace(_currentUser.Name) ? "system" : _currentUser.Name),
                 Action = action,
                 EntityType = entityType,
                 EntityId = entityId,

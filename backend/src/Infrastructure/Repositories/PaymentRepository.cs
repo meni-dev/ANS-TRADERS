@@ -117,13 +117,6 @@ public class PaymentRepository : IPaymentRepository
         return (items, totalCount);
     }
 
-    public async Task<int> GetLastSequenceAsync(
-        PaymentDirection direction, string financialYear, CancellationToken cancellationToken) =>
-        await _context.Payments
-            .Where(p => p.Direction == direction && p.FinancialYear == financialYear && p.Sequence != null)
-            .Select(p => p.Sequence)
-            .MaxAsync(cancellationToken) ?? 0;
-
     public async Task<IReadOnlyList<PaymentAllocation>> GetLiveAllocationsForInvoiceAsync(
         Guid invoiceId, CancellationToken cancellationToken) =>
         await _context.PaymentAllocations

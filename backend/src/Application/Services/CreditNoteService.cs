@@ -20,9 +20,14 @@ public class CreditNoteService : ICreditNoteService
     private readonly IPaymentLedger _paymentLedger;
     private readonly IPaymentRepository _paymentRepository;
     private readonly IPeriodLock _periodLock;
+    private readonly ICashDayLock _cashDayLock;
     private readonly IAuditLog _audit;
     private readonly ICurrentUser _currentUser;
     private readonly IValidator<CreateCreditNoteRequest> _createValidator;
+
+    private readonly IUnitOfWork _unitOfWork;
+
+    private readonly IDocumentNumbers _numbers;
 
     public CreditNoteService(
         ICreditNoteRepository repository,
@@ -34,9 +39,12 @@ public class CreditNoteService : ICreditNoteService
         IPaymentLedger paymentLedger,
         IPaymentRepository paymentRepository,
         IPeriodLock periodLock,
+        ICashDayLock cashDayLock,
         IAuditLog audit,
         ICurrentUser currentUser,
-        IValidator<CreateCreditNoteRequest> createValidator)
+        IValidator<CreateCreditNoteRequest> createValidator,
+        IUnitOfWork unitOfWork,
+        IDocumentNumbers numbers)
     {
         _repository = repository;
         _invoiceRepository = invoiceRepository;
@@ -47,9 +55,12 @@ public class CreditNoteService : ICreditNoteService
         _paymentLedger = paymentLedger;
         _paymentRepository = paymentRepository;
         _periodLock = periodLock;
+        _cashDayLock = cashDayLock;
         _audit = audit;
         _currentUser = currentUser;
         _createValidator = createValidator;
+        _unitOfWork = unitOfWork;
+        _numbers = numbers;
     }
 
     public async Task<PagedResult<CreditNoteListItemDto>> SearchAsync(
@@ -71,181 +82,193 @@ public class CreditNoteService : ICreditNoteService
     public async Task<CreditNoteDto> CreateAsync(
         CreateCreditNoteRequest request, CancellationToken cancellationToken)
     {
-        _currentUser.Require(Permission.SalesReturn, "take goods back");
-
-        await ValidationHelper.ValidateAsync(_createValidator, request, cancellationToken);
-        await _periodLock.GuardAsync(request.NoteDate, "credit note", cancellationToken);
-
-        var invoice = await _invoiceRepository.GetByIdAsync(request.InvoiceId, cancellationToken)
-            ?? throw new NotFoundException(
-                $"Invoice '{request.InvoiceId}' was not found", "INVOICE_NOT_FOUND");
-
-        if (invoice.Status == InvoiceStatus.Cancelled)
+        // The document number is claimed inside this transaction, so a create that fails
+        // rolls the number back with it rather than leaving a gap in the series.
+        return await _unitOfWork.InTransactionAsync(async () =>
         {
-            throw new ConflictException(
-                $"{invoice.InvoiceNumber} was cancelled — there is nothing left to credit",
-                "INVOICE_CANCELLED");
-        }
+            _currentUser.Require(Permission.SalesReturn, "take goods back");
 
-        if (request.NoteDate < invoice.InvoiceDate)
-        {
-            throw Invalid("NoteDate", $"Goods cannot come back before {invoice.InvoiceNumber} was raised");
-        }
+            await ValidationHelper.ValidateAsync(_createValidator, request, cancellationToken);
+            await _periodLock.GuardAsync(request.NoteDate, "credit note", cancellationToken);
 
-        // Tracked: the party ledger moves the customer's balance on the entity itself.
-        var customer = invoice.CustomerId is { } customerId
-            ? await _customerRepository.GetByIdAsync(customerId, cancellationToken)
-            : null;
-
-        // Everything is checked before one field is written. The EnsureAvailable doctrine: a bad
-        // request is rejected whole rather than half-applied, so nothing has to be unwound.
-        var lines = ResolveLines(invoice, request.Lines);
-
-        var financialYear = FinancialYear.For(request.NoteDate);
-        var sequence = await _repository.GetLastSequenceAsync(financialYear, cancellationToken) + 1;
-
-        var note = new CreditNote
-        {
-            CreditNoteNumber = $"CRN/{financialYear}/{sequence:D4}",
-            FinancialYear = financialYear,
-            Sequence = sequence,
-            NoteDate = request.NoteDate,
-            InvoiceId = invoice.Id,
-            InvoiceNumber = invoice.InvoiceNumber,
-            InvoiceDate = invoice.InvoiceDate,
-            CustomerId = invoice.CustomerId,
-            CustomerName = invoice.CustomerName,
-            CustomerPhone = invoice.CustomerPhone,
-            CustomerGstin = invoice.CustomerGstin,
-            CustomerStateCode = invoice.CustomerStateCode,
-
-            // Copied, never recomputed. If the customer's state code was corrected after the sale,
-            // this note still has to reverse the tax that was actually charged.
-            IsInterState = invoice.IsInterState,
-            Reason = request.Reason.Trim(),
-        };
-
-        var lineAmounts = new List<LineAmounts>(lines.Count);
-
-        foreach (var (item, quantity) in lines)
-        {
-            // The bill-level discount came off this line too, so a return has to give back what was
-            // actually charged. Apportioned by how much of the line is coming back — return half of
-            // it and half the discount goes with it. Without this a discounted bill returned in full
-            // would credit more than the customer ever paid.
-            var shareOfBillDiscount = item.Quantity == 0
-                ? 0m
-                : Math.Round(
-                    item.BillDiscountShare * quantity / item.Quantity, 2, MidpointRounding.AwayFromZero);
-
-            var amounts = GstCalculator.ComputeLine(
-                quantity, item.Rate, item.DiscountPercent, item.GstRate, invoice.IsInterState,
-                shareOfBillDiscount);
-
-            lineAmounts.Add(amounts);
-
-            note.Items.Add(new CreditNoteItem
-            {
-                CreditNoteId = note.Id,
-                InvoiceItemId = item.Id,
-                ProductId = item.ProductId,
-
-                // From the invoice line, not the product master: if the part was renamed since the
-                // sale, this note must still read as the bill it credits.
-                PartNumber = item.PartNumber,
-                ItemName = item.ItemName,
-                Hsn = item.Hsn,
-                Uqc = item.Uqc,
-                Quantity = quantity,
-                Rate = item.Rate,
-                CostRate = item.CostRate,
-                DiscountPercent = item.DiscountPercent,
-                DiscountAmount = amounts.DiscountAmount,
-                GrossAmount = amounts.GrossAmount,
-                TaxableAmount = amounts.TaxableAmount,
-                GstRate = item.GstRate,
-                CgstAmount = amounts.CgstAmount,
-                SgstAmount = amounts.SgstAmount,
-                IgstAmount = amounts.IgstAmount,
-                LineTotal = amounts.LineTotal,
-            });
-
-            item.ReturnedQuantity += quantity;
-
-            var product = await _productRepository.GetByIdAsync(item.ProductId, cancellationToken);
-
-            if (product is not null)
-            {
-                await _stockLedger.RecordAsync(
-                    product, quantity, StockMovementType.SalesReturn,
-                    note.Id, note.CreditNoteNumber, notes: null, cancellationToken);
-            }
-        }
-
-        ApplyTotals(note, GstCalculator.ComputeDocument(lineAmounts));
-
-        // Against the bill first, capped at what it still owed; the rest belongs to the account.
-        note.AppliedToInvoiceAmount = _paymentLedger.ApplyCredit(invoice, note.GrandTotal);
-
-        var refund = Round(request.RefundAmount ?? 0m);
-        var creditToAccount = Round(note.GrandTotal - note.AppliedToInvoiceAmount);
-
-        if (refund > creditToAccount)
-        {
-            // The shop can only hand back money it actually took. The part that closed the bill was
-            // never cash in the drawer.
-            throw Invalid(
-                "RefundAmount",
-                creditToAccount <= 0
-                    ? $"{note.CreditNoteNumber} went entirely against {invoice.InvoiceNumber}, so there is nothing to refund"
-                    : $"Only {creditToAccount:0.00} of this credit can be refunded");
-        }
-
-        // A walk-in has no account for a credit to sit on. Refusing beats letting the money quietly
-        // disappear — and quietly overstating what the shop earned.
-        if (customer is null && creditToAccount > refund)
-        {
-            throw Invalid(
-                "RefundAmount",
-                $"{invoice.InvoiceNumber} was a counter sale with no customer on file. " +
-                $"Refund the full {creditToAccount:0.00}, or re-bill it to a saved customer first.");
-        }
-
-        await _repository.AddAsync(note, cancellationToken);
-
-        if (customer is not null)
-        {
-            // The whole note, always. The split above is only how the settlement is presented on the
-            // document; what the customer is owed is the full value of the goods they brought back.
-            await _partyLedger.RecordForCustomerAsync(
-                customer, -note.GrandTotal, PartyLedgerEntryType.CreditNote, note.NoteDate,
-                note.Id, note.CreditNoteNumber, note.Reason, cancellationToken);
-        }
-
-        if (refund > 0)
-        {
-            await _paymentLedger.RecordCounterPaymentAsync(
-                new PaymentDraft(
-                    PaymentDirection.Paid,
-                    customer,
-                    null,
-                    note.CustomerName,
-                    note.NoteDate,
-                    refund,
-                    ParseMode(request.RefundMode),
-                    request.RefundReference,
-                    $"Refund against {note.CreditNoteNumber}",
-                    IsCounterPayment: true,
-                    Cheque: null,
-                    Allocations: [new AllocationTarget(null, null, refund) { CreditNote = note }]),
+            await _cashDayLock.GuardAsync(
+                request.NoteDate,
+                "credit note",
+                request.RefundAmount > 0 && string.Equals(request.RefundMode, "Cash", StringComparison.OrdinalIgnoreCase),
                 cancellationToken);
 
-            note.RefundedAmount = refund;
-        }
+            var invoice = await _invoiceRepository.GetByIdAsync(request.InvoiceId, cancellationToken)
+                ?? throw new NotFoundException(
+                    $"Invoice '{request.InvoiceId}' was not found", "INVOICE_NOT_FOUND");
 
-        await _repository.SaveChangesAsync(cancellationToken);
+            if (invoice.Status == InvoiceStatus.Cancelled)
+            {
+                throw new ConflictException(
+                    $"{invoice.InvoiceNumber} was cancelled — there is nothing left to credit",
+                    "INVOICE_CANCELLED");
+            }
 
-        return note.ToDto();
+            if (request.NoteDate < invoice.InvoiceDate)
+            {
+                throw Invalid("NoteDate", $"Goods cannot come back before {invoice.InvoiceNumber} was raised");
+            }
+
+            // Tracked: the party ledger moves the customer's balance on the entity itself.
+            var customer = invoice.CustomerId is { } customerId
+                ? await _customerRepository.GetByIdAsync(customerId, cancellationToken)
+                : null;
+
+            // Everything is checked before one field is written. The EnsureAvailable doctrine: a bad
+            // request is rejected whole rather than half-applied, so nothing has to be unwound.
+            var lines = ResolveLines(invoice, request.Lines);
+
+            var financialYear = FinancialYear.For(request.NoteDate);
+            var sequence = await _numbers.NextAsync(DocumentKind.CreditNote, financialYear, cancellationToken);
+
+            var note = new CreditNote
+            {
+                CreditNoteNumber = $"CRN/{financialYear}/{sequence:D4}",
+                FinancialYear = financialYear,
+                Sequence = sequence,
+                NoteDate = request.NoteDate,
+                InvoiceId = invoice.Id,
+                InvoiceNumber = invoice.InvoiceNumber,
+                InvoiceDate = invoice.InvoiceDate,
+                CustomerId = invoice.CustomerId,
+                CustomerName = invoice.CustomerName,
+                CustomerPhone = invoice.CustomerPhone,
+                CustomerGstin = invoice.CustomerGstin,
+                CustomerStateCode = invoice.CustomerStateCode,
+
+                // Copied, never recomputed. If the customer's state code was corrected after the sale,
+                // this note still has to reverse the tax that was actually charged.
+                IsInterState = invoice.IsInterState,
+                Reason = request.Reason.Trim(),
+            };
+
+            var lineAmounts = new List<LineAmounts>(lines.Count);
+
+            foreach (var (item, quantity) in lines)
+            {
+                // The bill-level discount came off this line too, so a return has to give back what was
+                // actually charged. Apportioned by how much of the line is coming back — return half of
+                // it and half the discount goes with it. Without this a discounted bill returned in full
+                // would credit more than the customer ever paid.
+                var shareOfBillDiscount = item.Quantity == 0
+                    ? 0m
+                    : Math.Round(
+                        item.BillDiscountShare * quantity / item.Quantity, 2, MidpointRounding.AwayFromZero);
+
+                var amounts = GstCalculator.ComputeLine(
+                    quantity, item.Rate, item.DiscountPercent, item.GstRate, invoice.IsInterState,
+                    shareOfBillDiscount);
+
+                lineAmounts.Add(amounts);
+
+                note.Items.Add(new CreditNoteItem
+                {
+                    CreditNoteId = note.Id,
+                    InvoiceItemId = item.Id,
+                    ProductId = item.ProductId,
+
+                    // From the invoice line, not the product master: if the part was renamed since the
+                    // sale, this note must still read as the bill it credits.
+                    PartNumber = item.PartNumber,
+                    ItemName = item.ItemName,
+                    Hsn = item.Hsn,
+                    Uqc = item.Uqc,
+                    SupplyType = item.SupplyType,
+                    Quantity = quantity,
+                    Rate = item.Rate,
+                    CostRate = item.CostRate,
+                    DiscountPercent = item.DiscountPercent,
+                    DiscountAmount = amounts.DiscountAmount,
+                    GrossAmount = amounts.GrossAmount,
+                    TaxableAmount = amounts.TaxableAmount,
+                    GstRate = item.GstRate,
+                    CgstAmount = amounts.CgstAmount,
+                    SgstAmount = amounts.SgstAmount,
+                    IgstAmount = amounts.IgstAmount,
+                    LineTotal = amounts.LineTotal,
+                });
+
+                item.ReturnedQuantity += quantity;
+
+                var product = await _productRepository.GetByIdAsync(item.ProductId, cancellationToken);
+
+                if (product is not null)
+                {
+                    await _stockLedger.RecordAsync(
+                        product, quantity, StockMovementType.SalesReturn, note.NoteDate,
+                        note.Id, note.CreditNoteNumber, notes: null, cancellationToken);
+                }
+            }
+
+            ApplyTotals(note, GstCalculator.ComputeDocument(lineAmounts));
+
+            // Against the bill first, capped at what it still owed; the rest belongs to the account.
+            note.AppliedToInvoiceAmount = _paymentLedger.ApplyCredit(invoice, note.GrandTotal);
+
+            var refund = Round(request.RefundAmount ?? 0m);
+            var creditToAccount = Round(note.GrandTotal - note.AppliedToInvoiceAmount);
+
+            if (refund > creditToAccount)
+            {
+                // The shop can only hand back money it actually took. The part that closed the bill was
+                // never cash in the drawer.
+                throw Invalid(
+                    "RefundAmount",
+                    creditToAccount <= 0
+                        ? $"{note.CreditNoteNumber} went entirely against {invoice.InvoiceNumber}, so there is nothing to refund"
+                        : $"Only {creditToAccount:0.00} of this credit can be refunded");
+            }
+
+            // A walk-in has no account for a credit to sit on. Refusing beats letting the money quietly
+            // disappear — and quietly overstating what the shop earned.
+            if (customer is null && creditToAccount > refund)
+            {
+                throw Invalid(
+                    "RefundAmount",
+                    $"{invoice.InvoiceNumber} was a counter sale with no customer on file. " +
+                    $"Refund the full {creditToAccount:0.00}, or re-bill it to a saved customer first.");
+            }
+
+            await _repository.AddAsync(note, cancellationToken);
+
+            if (customer is not null)
+            {
+                // The whole note, always. The split above is only how the settlement is presented on the
+                // document; what the customer is owed is the full value of the goods they brought back.
+                await _partyLedger.RecordForCustomerAsync(
+                    customer, -note.GrandTotal, PartyLedgerEntryType.CreditNote, note.NoteDate,
+                    note.Id, note.CreditNoteNumber, note.Reason, cancellationToken);
+            }
+
+            if (refund > 0)
+            {
+                await _paymentLedger.RecordCounterPaymentAsync(
+                    new PaymentDraft(
+                        PaymentDirection.Paid,
+                        customer,
+                        null,
+                        note.CustomerName,
+                        note.NoteDate,
+                        refund,
+                        ParseMode(request.RefundMode),
+                        request.RefundReference,
+                        $"Refund against {note.CreditNoteNumber}",
+                        IsCounterPayment: true,
+                        Cheque: null,
+                        Allocations: [new AllocationTarget(null, null, refund) { CreditNote = note }]),
+                    cancellationToken);
+
+                note.RefundedAmount = refund;
+            }
+
+            await _repository.SaveChangesAsync(cancellationToken);
+
+            return note.ToDto();
+        }, cancellationToken);
     }
 
     public async Task<ReturnableDocumentDto> GetReturnableAsync(
@@ -406,17 +429,36 @@ public class CreditNoteService : ICreditNoteService
                 cancellationToken);
         }
 
+        // Undoing a credit note takes the returned goods back off the shelf. If they have since
+        // been sold again there is nothing there to take, so every line is checked before any of
+        // them moves — a half-applied undo is worse than either outcome.
+        var reversals = new List<(Product Product, decimal Quantity)>(note.Items.Count);
+
         foreach (var line in note.Items)
         {
             var product = await _productRepository.GetByIdAsync(line.ProductId, cancellationToken);
 
             if (product is not null)
             {
-                await _stockLedger.RecordAsync(
-                    product, -line.Quantity, StockMovementType.SalesReturnCancelled,
-                    note.Id, note.CreditNoteNumber, notes: null, cancellationToken);
-            }
+                _stockLedger.EnsureReversible(
+                    product,
+                    line.Quantity,
+                    note.CreditNoteNumber,
+                    "Raise a fresh bill for what went out rather than cancelling the note.");
 
+                reversals.Add((product, line.Quantity));
+            }
+        }
+
+        foreach (var (product, quantity) in reversals)
+        {
+            await _stockLedger.RecordAsync(
+                product, -quantity, StockMovementType.SalesReturnCancelled, note.NoteDate,
+                note.Id, note.CreditNoteNumber, notes: null, cancellationToken);
+        }
+
+        foreach (var line in note.Items)
+        {
             var item = invoice.Items.FirstOrDefault(i => i.Id == line.InvoiceItemId);
 
             if (item is not null)

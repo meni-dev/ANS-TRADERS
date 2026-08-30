@@ -33,7 +33,12 @@ public static class PartyRules
             .Matches(PhonePattern).WithMessage("Enter a valid phone number (10-15 digits)");
 
     public static IRuleBuilderOptions<T, string?> PartyGstin<T>(this IRuleBuilder<T, string?> rule) =>
-        rule.Matches(GstinPattern).WithMessage("Enter a valid 15-character GSTIN");
+        rule.Matches(GstinPattern).WithMessage("Enter a valid 15-character GSTIN")
+            // Shape first, then arithmetic. The regex catches a wrong length or a letter where a
+            // digit belongs; the check digit catches the far commoner case of one character mistyped
+            // in an otherwise well-formed number.
+            .Must(g => string.IsNullOrWhiteSpace(g) || GstRules.HasValidChecksum(g!))
+            .WithMessage("That GSTIN's check digit does not match — one character is mistyped");
 
     public static IRuleBuilderOptions<T, string?> PartyEmail<T>(this IRuleBuilder<T, string?> rule) =>
         rule.Matches(EmailPattern).WithMessage("Enter a valid email address");

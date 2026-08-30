@@ -4,6 +4,11 @@ import type { SxProps, Theme } from '@mui/material'
 /**
  * The shop's mark.
  * <p>
+ * One file, used everywhere — the sidebar, the sign-in card and every printed bill. A vector
+ * redraw was sharper at sidebar size and was dropped anyway: a mark that differs between the screen
+ * and the paper reads as two businesses, and the shop's own artwork is the one that matters.
+ * </p>
+ * <p>
  * Served from <code>public/</code> rather than imported, so the file can be swapped for a different
  * shop without a rebuild — and so a printed invoice fetches it by a plain URL, which is the one
  * thing every browser's print path handles the same way.

@@ -40,5 +40,7 @@ public class CreditNoteItemConfiguration : IEntityTypeConfiguration<CreditNoteIt
 
         // Backs the over-return guard: "how much of this invoice line has already come back".
         builder.HasIndex(i => i.InvoiceItemId);
+
+        builder.Property(i => i.SupplyType).HasConversion<string>().HasMaxLength(20);
     }
 }

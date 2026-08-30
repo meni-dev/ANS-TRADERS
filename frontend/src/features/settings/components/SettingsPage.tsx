@@ -1,9 +1,11 @@
+import { describeError } from '@/lib/api/errors'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { FormSection } from '@/components/form/FormSection'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
 import { RHFTextField } from '@/components/form/RHFTextField'
-import { ApiError } from '@/lib/api/client'
 import { INDIAN_STATES } from '@/lib/indianStates'
 import { zodResolver } from '@hookform/resolvers/zod'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
@@ -32,6 +34,7 @@ function toFormValues(settings: ShopSettingsDto): ShopSettingsFormValues {
     bankDetails: settings.bankDetails ?? '',
     invoiceTerms: settings.invoiceTerms ?? '',
     invoiceTemplate: settings.invoiceTemplate,
+    booksStartFrom: settings.booksStartFrom,
   }
 }
 
@@ -71,9 +74,7 @@ export function SettingsPage() {
       await updateSettings.mutateAsync(submitted)
       notify('Settings saved')
     } catch (error) {
-      setServerError(
-        error instanceof ApiError ? error.message : 'Something went wrong. Please try again.',
-      )
+      setServerError(describeError(error, 'Something went wrong. Please try again.'))
     }
   })
 
@@ -101,12 +102,12 @@ export function SettingsPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 2.5 }}>
-        <Typography variant="h1">Settings</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Your shop's details and how a printed bill looks.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="Settings"
+        icon={<SettingsOutlinedIcon />}
+        iconTone="neutral"
+        caption="Your shop's details and how a printed bill looks."
+      />
 
       <FormProvider {...form}>
         <form onSubmit={onSubmit} noValidate>
@@ -183,6 +184,17 @@ export function SettingsPage() {
                   required
                   slotProps={{ input: { readOnly: true } }}
                   helperText="Set by the state above"
+                />
+              </Grid>
+            </Grid>
+
+            <Grid container spacing={2} sx={{ mt: 0 }}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <RHFTextField
+                  name="booksStartFrom"
+                  label="Books Begin From"
+                  type="date"
+                  helperText="Nothing can be dated before this. Leave empty and one mistyped year opens a closed financial year"
                 />
               </Grid>
             </Grid>

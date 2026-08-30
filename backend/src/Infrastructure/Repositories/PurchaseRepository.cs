@@ -75,12 +75,6 @@ public class PurchaseRepository : IPurchaseRepository
         return (items, totalCount);
     }
 
-    public async Task<int> GetLastSequenceAsync(string financialYear, CancellationToken cancellationToken) =>
-        await _context.Purchases
-            .Where(p => p.FinancialYear == financialYear)
-            .Select(p => (int?)p.Sequence)
-            .MaxAsync(cancellationToken) ?? 0;
-
     public Task<bool> SupplierInvoiceNumberExistsAsync(
         Guid supplierId, string supplierInvoiceNumber, CancellationToken cancellationToken) =>
         _context.Purchases.AnyAsync(

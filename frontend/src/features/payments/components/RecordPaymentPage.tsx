@@ -1,18 +1,18 @@
+import { describeError } from '@/lib/api/errors'
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { CustomerPicker } from '@/features/customers/components/CustomerPicker'
 import type { CustomerDto } from '@/features/customers/types'
 import { SupplierPicker } from '@/features/suppliers/components/SupplierPicker'
 import type { SupplierDto } from '@/features/suppliers/types'
-import { ApiError } from '@/lib/api/client'
 import { formatCurrency, formatDate, todayIso } from '@/lib/format'
 import { zodResolver } from '@hookform/resolvers/zod'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import {
   Alert,
   Box,
   Button,
   Divider,
   Grid,
-  IconButton,
   Paper,
   Stack,
   Typography,
@@ -102,11 +102,7 @@ export function RecordPaymentPage() {
 
       navigate(`/accounts/payments?highlight=${payment.id}`)
     } catch (error) {
-      setSubmitError(
-        error instanceof ApiError
-          ? (Object.values(error.errors).flat()[0] ?? error.message)
-          : 'Could not record this payment',
-      )
+      setSubmitError(describeError(error, 'Could not record this payment'))
     }
   }
 
@@ -114,21 +110,14 @@ export function RecordPaymentPage() {
     <FormProvider {...form}>
       <Box component="form" onSubmit={form.handleSubmit(onSubmit)}>
         <Stack spacing={2.5}>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-            <IconButton onClick={() => navigate('/accounts/payments')} aria-label="Back">
-              <ArrowBackIcon />
-            </IconButton>
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                {isReceipt ? 'Record a receipt' : 'Record a payment'}
-              </Typography>
-              <Typography sx={{ fontSize: 13.5, color: 'text.secondary' }}>
-                {isReceipt
-                  ? 'Money a customer has handed over'
-                  : 'Money paid to a supplier'}
-              </Typography>
-            </Box>
-          </Stack>
+          <PageHeader
+            title={isReceipt ? 'Record a receipt' : 'Record a payment'}
+            icon={<PaymentsOutlinedIcon />}
+            iconTone="teal"
+            caption={isReceipt ? 'Money a customer has handed over' : 'Money paid to a supplier'}
+            onBack={() => navigate('/accounts/payments')}
+            flush
+          />
 
           {submitError ? <Alert severity="error">{submitError}</Alert> : null}
 
@@ -176,7 +165,6 @@ export function RecordPaymentPage() {
                   label="Date"
                   type="date"
                   required
-                  slotProps={{ inputLabel: { shrink: true } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -216,7 +204,6 @@ export function RecordPaymentPage() {
                       label="Date on the cheque"
                       type="date"
                       required
-                      slotProps={{ inputLabel: { shrink: true } }}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -225,7 +212,6 @@ export function RecordPaymentPage() {
                       label="Handed over on"
                       type="date"
                       required
-                      slotProps={{ inputLabel: { shrink: true } }}
                     />
                   </Grid>
                 </>

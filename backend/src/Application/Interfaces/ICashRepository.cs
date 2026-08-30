@@ -11,6 +11,13 @@ public interface ICashRepository
     Task<DayClose?> GetLastCloseOnOrBeforeAsync(DateOnly date, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The most recent day close in the book, whatever its date. Everything on or before it has
+    /// been counted — a close carries its opening forward from the one before, so a day nobody
+    /// closed individually still sits inside a counted stretch.
+    /// </summary>
+    Task<DayClose?> GetLatestCloseAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Cash in and out over a range, from every document that moves the drawer: receipts, payments,
     /// refunds and expenses. Returned unordered — the service sorts and runs the balance.
     /// </summary>

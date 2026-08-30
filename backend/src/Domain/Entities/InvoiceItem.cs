@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Enums;
 
 namespace Domain.Entities;
 
@@ -70,6 +71,15 @@ public class InvoiceItem : Entity
     public decimal TaxableAmount { get; set; }
 
     public decimal GstRate { get; set; }
+
+    /// <summary>
+    /// Snapshotted at the time of sale, like the rate and the cost beside it.
+    /// <para>
+    /// A part reclassified next year must not move last year's bill into a different table of a
+    /// return that has already been filed.
+    /// </para>
+    /// </summary>
+    public SupplyType SupplyType { get; set; } = SupplyType.Taxable;
     public decimal CgstAmount { get; set; }
     public decimal SgstAmount { get; set; }
     public decimal IgstAmount { get; set; }

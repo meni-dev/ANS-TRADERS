@@ -1,11 +1,18 @@
 import { formatCurrency, formatDate, formatQuantity } from '@/lib/format'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
-import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material'
+import { PanelCard } from '@/components/data/PanelCard'
+import LocalFireDepartmentOutlinedIcon from '@mui/icons-material/LocalFireDepartmentOutlined'
+import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined'
+import AddShoppingCartOutlinedIcon from '@mui/icons-material/AddShoppingCartOutlined'
+import { Box, Button, Chip, Stack, Typography } from '@mui/material'
+import type { AccentTone } from '@/theme/theme'
 import type { ReactNode } from 'react'
 import type { RecentInvoiceDto, ReorderItemDto, TopSellingItemDto } from '../types'
 
 type ListPanelProps = {
   title: string
+  icon: ReactNode
+  iconTone: AccentTone
   caption: string
   emptyMessage: string
   actionLabel: string
@@ -17,6 +24,8 @@ type ListPanelProps = {
 /** The shell the three bottom panels share — title, rows, and one way through to the full screen. */
 function ListPanel({
   title,
+  icon,
+  iconTone,
   caption,
   emptyMessage,
   actionLabel,
@@ -25,33 +34,29 @@ function ListPanel({
   isEmpty,
 }: ListPanelProps) {
   return (
-    <Paper
-      variant="outlined"
-      sx={{ p: 2.5, borderRadius: '8px', height: '100%', display: 'flex', flexDirection: 'column' }}
+    <PanelCard
+      title={title}
+      icon={icon}
+      iconTone={iconTone}
+      caption={caption}
+      footer={
+        <Button
+          size="small"
+          variant="text"
+          endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
+          onClick={onAction}
+          sx={{ ml: -1 }}
+        >
+          {actionLabel}
+        </Button>
+      }
     >
-      <Typography variant="h3">{title}</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, mb: 1.5 }}>
-        {caption}
-      </Typography>
-
-      <Box sx={{ flexGrow: 1 }}>
-        {isEmpty ? (
-          <Typography sx={{ fontSize: 13, color: 'text.disabled', py: 2 }}>{emptyMessage}</Typography>
-        ) : (
-          children
-        )}
-      </Box>
-
-      <Button
-        size="small"
-        variant="text"
-        endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
-        onClick={onAction}
-        sx={{ alignSelf: 'flex-start', mt: 1.5, ml: -1 }}
-      >
-        {actionLabel}
-      </Button>
-    </Paper>
+      {isEmpty ? (
+        <Typography sx={{ fontSize: 13, color: 'text.disabled', py: 2 }}>{emptyMessage}</Typography>
+      ) : (
+        children
+      )}
+    </PanelCard>
   )
 }
 
@@ -123,6 +128,8 @@ export function ReorderPanel({
   return (
     <ListPanel
       title="Needs reordering"
+      icon={<AddShoppingCartOutlinedIcon />}
+      iconTone="amber"
       caption="At or below the reorder level."
       emptyMessage="Everything is above its reorder level."
       actionLabel="Low stock"
@@ -152,6 +159,8 @@ export function TopSellersPanel({
   return (
     <ListPanel
       title="Top sellers"
+      icon={<LocalFireDepartmentOutlinedIcon />}
+      iconTone="rose"
       caption="This month, by value sold."
       emptyMessage="No sales this month yet."
       actionLabel="New invoice"
@@ -182,6 +191,8 @@ export function RecentInvoicesPanel({
   return (
     <ListPanel
       title="Recent invoices"
+      icon={<ReceiptOutlinedIcon />}
+      iconTone="blue"
       caption="The last five raised."
       emptyMessage="No invoices raised yet."
       actionLabel="All invoices"

@@ -30,6 +30,16 @@ public class DayClose : AuditableEntity
     /// <summary>Rent, wages, tea — cash that left the drawer without a party behind it.</summary>
     public decimal CashExpenses { get; set; }
 
+    /// <summary>
+    /// The float, money drawn from the bank, capital put in — cash with no party behind it. Held
+    /// apart from receipts because somebody reading a closed day needs to see that the till went up
+    /// for a reason other than trade.
+    /// </summary>
+    public decimal CashOtherIn { get; set; }
+
+    /// <summary>Money banked, and drawings taken out.</summary>
+    public decimal CashOtherOut { get; set; }
+
     /// <summary>Opening + received − paid out − expenses. What should have been there.</summary>
     public decimal ExpectedCash { get; set; }
 

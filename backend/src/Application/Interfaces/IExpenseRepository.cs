@@ -16,8 +16,6 @@ public interface IExpenseRepository
         int pageSize,
         CancellationToken cancellationToken);
 
-    Task<int> GetLastSequenceAsync(string financialYear, CancellationToken cancellationToken);
-
     /// <summary>Live spend over a range, grouped by where it went. Cancelled rows are excluded.</summary>
     Task<IReadOnlyList<(ExpenseCategory Category, decimal Amount, int Count)>> GetTotalsByCategoryAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken);

@@ -1,9 +1,9 @@
+import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
 import { RHFTextField } from '@/components/form/RHFTextField'
-import { ApiError } from '@/lib/api/client'
 import { todayIso } from '@/lib/format'
 import { zodResolver } from '@hookform/resolvers/zod'
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
@@ -53,11 +53,7 @@ export function RecordExpenseDialog({ onClose }: { onClose: () => void }) {
       notify(`${expense.expenseNumber} recorded`, 'success')
       onClose()
     } catch (caught) {
-      setServerError(
-        caught instanceof ApiError
-          ? (Object.values(caught.errors).flat()[0] ?? caught.message)
-          : 'Could not record that',
-      )
+      setServerError(describeError(caught, 'Could not record that'))
     }
   }
 
@@ -83,7 +79,6 @@ export function RecordExpenseDialog({ onClose }: { onClose: () => void }) {
                     label="Date"
                     type="date"
                     required
-                    slotProps={{ inputLabel: { shrink: true } }}
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>

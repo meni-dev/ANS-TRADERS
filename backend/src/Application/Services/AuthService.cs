@@ -37,15 +37,43 @@ public class AuthService : IAuthService
     {
         var user = await _repository.GetByUsernameAsync(request.Username ?? string.Empty, cancellationToken);
 
+        // Locked before the password is even looked at, so a locked account costs an attacker
+        // nothing to find and gains them nothing either — no hashing work is done.
+        //
+        // This one says plainly what happened. Hiding it behind the generic message would leave
+        // somebody who typed their own password correctly with no idea why it stopped working, and
+        // in a shop of five people the account names are not a secret worth protecting.
+        if (user is not null && user.LockedOutUntil is { } until && until > DateTimeOffset.UtcNow)
+        {
+            var minutes = Math.Max(1, (int)Math.Ceiling((until - DateTimeOffset.UtcNow).TotalMinutes));
+
+            throw new ValidationAppException(new Dictionary<string, string[]>
+            {
+                ["Username"] =
+                [
+                    $"Too many wrong passwords. This account is locked for another {minutes} minute"
+                    + (minutes == 1 ? "." : "s.")
+                ],
+            });
+        }
+
         // One message for both a wrong name and a wrong password. Telling them apart would let
         // somebody find out which accounts exist by trying names.
         if (user is null || !user.IsActive || !PasswordHasher.Verify(request.Password ?? string.Empty, user.PasswordHash))
         {
+            if (user is not null)
+            {
+                await RecordFailureAsync(user, cancellationToken);
+            }
+
             throw new ValidationAppException(new Dictionary<string, string[]>
             {
                 ["Username"] = ["That username and password do not match"],
             });
         }
+
+        user.FailedSignInCount = 0;
+        user.LockedOutUntil = null;
 
         var session = new UserSession
         {
@@ -57,6 +85,13 @@ public class AuthService : IAuthService
         await _repository.AddSessionAsync(session, cancellationToken);
 
         user.LastSignedInAt = DateTimeOffset.UtcNow;
+
+        // Recorded because the trail already offered the filter and answered nothing. Who was at
+        // the counter when a bill was raised is a question that gets asked, and "last signed in"
+        // alone cannot answer it for a machine two people share.
+        await _audit.RecordAsync(
+            AuditAction.SignedIn, "User", user.Id, user.Username,
+            user.Role?.Name, cancellationToken, actedBy: user.Name);
 
         await _repository.SaveChangesAsync(cancellationToken);
 
@@ -165,6 +200,11 @@ public class AuthService : IAuthService
         user.MustChangePassword = true;
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
+        // Clearing the lock is part of resetting: otherwise the owner hands over a new password and
+        // the person still cannot get in, with nothing on screen explaining why.
+        user.FailedSignInCount = 0;
+        user.LockedOutUntil = null;
+
         await _repository.RemoveSessionsForUserAsync(user.Id, cancellationToken);
 
         await _audit.RecordAsync(
@@ -267,6 +307,33 @@ public class AuthService : IAuthService
         await _repository.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>How many wrong passwords in a row before the account stops answering.</summary>
+    private const int FailuresBeforeLockout = 5;
+
+    /// <summary>
+    /// Counts the failure and locks the account once there have been enough of them.
+    /// <para>
+    /// The window grows with each further round — a minute, then four, then nine — so somebody who
+    /// mistyped twice is barely inconvenienced while a script working through a word list is
+    /// stopped within seconds and never gets going again. Capped, so an account is never locked out
+    /// for a day because somebody was bored.
+    /// </para>
+    /// </summary>
+    private async Task RecordFailureAsync(User user, CancellationToken cancellationToken)
+    {
+        user.FailedSignInCount++;
+
+        if (user.FailedSignInCount >= FailuresBeforeLockout)
+        {
+            var rounds = user.FailedSignInCount - FailuresBeforeLockout + 1;
+            var minutes = Math.Min(30, rounds * rounds);
+
+            user.LockedOutUntil = DateTimeOffset.UtcNow.AddMinutes(minutes);
+        }
+
+        await _repository.SaveChangesAsync(cancellationToken);
+    }
+
     private static bool Administers(User user) =>
         user.Role?.Has(Permission.UserManage) == true;
 
@@ -301,6 +368,8 @@ public class AuthService : IAuthService
         AuditAction.SignedIn => "Signed in",
         AuditAction.RoleChanged => "Changed a role",
         AuditAction.UserRoleChanged => "Moved someone to another role",
+        AuditAction.MoneyMoved => "Moved money in or out",
+        AuditAction.SettingsChanged => "Changed the shop's details",
         _ => "Imported a catalogue",
     };
 

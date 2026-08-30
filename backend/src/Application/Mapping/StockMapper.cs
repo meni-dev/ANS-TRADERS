@@ -28,6 +28,7 @@ public static class StockMapper
         movement.MovementType.ToString(),
         movement.Quantity,
         movement.BalanceAfter,
+        movement.MovementDate,
         movement.MovedAt,
         movement.ReferenceId,
         movement.ReferenceNumber,

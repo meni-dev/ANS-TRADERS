@@ -3,7 +3,9 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import ErrorOutlineOutlinedIcon from '@mui/icons-material/ErrorOutlineOutlined'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
-import { Box, Paper, Stack, Typography } from '@mui/material'
+import { PanelCard } from '@/components/data/PanelCard'
+import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined'
+import { Box, Stack, Typography } from '@mui/material'
 import type { ReactNode } from 'react'
 import type { AuditChecksDto } from '../types'
 
@@ -66,11 +68,12 @@ export function AuditPanel({ audit, monthLabel }: { audit: AuditChecksDto; month
   const b2bShare = totalSales > 0 ? Math.round((audit.b2BSales / totalSales) * 100) : 0
 
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '8px', height: '100%' }}>
-      <Typography variant="h3">Audit checks</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, mb: 1 }}>
-        Numbering across {audit.financialYear}; everything else for {monthLabel}.
-      </Typography>
+    <PanelCard
+      title="Audit checks"
+      icon={<FactCheckOutlinedIcon />}
+      iconTone="teal"
+      caption={`Numbering across ${audit.financialYear}; everything else for ${monthLabel}.`}
+    >
 
       {/* Ahead even of the numbering gaps, because this is the only check whose failure means a
           figure already on screen is wrong. Everything else reports on the documents; this reports
@@ -180,6 +183,6 @@ export function AuditPanel({ audit, monthLabel }: { audit: AuditChecksDto; month
               'The buyer is likely a business that could have claimed credit.'
         }
       />
-    </Paper>
+    </PanelCard>
   )
 }

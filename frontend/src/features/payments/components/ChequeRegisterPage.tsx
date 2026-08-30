@@ -1,7 +1,7 @@
+import { describeError } from '@/lib/api/errors'
 import { DataTable } from '@/components/data/DataTable'
-import { ApiError } from '@/lib/api/client'
 import { formatCurrency, formatDate, todayIso } from '@/lib/format'
-import { Alert, Box, Button, Chip, Stack, Tab, Tabs, Typography } from '@mui/material'
+import { Alert, Button, Chip, Stack, Tab, Tabs, Typography } from '@mui/material'
 import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid'
 import { useMemo, useState } from 'react'
 import { BounceChequeDialog } from './BounceChequeDialog'
@@ -83,7 +83,7 @@ export function ChequeRegisterPage() {
     try {
       await moveCheque.mutateAsync({ paymentId: row.id, action, onDate: today })
     } catch (error) {
-      setActionError(error instanceof ApiError ? error.message : 'Could not update this cheque')
+      setActionError(describeError(error, 'Could not update this cheque'))
     }
   }
 

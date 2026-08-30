@@ -17,9 +17,12 @@ public class PaymentService : IPaymentService
     private readonly ICustomerRepository _customerRepository;
     private readonly ISupplierRepository _supplierRepository;
     private readonly IPeriodLock _periodLock;
+    private readonly ICashDayLock _cashDayLock;
     private readonly IAuditLog _audit;
     private readonly ICurrentUser _currentUser;
     private readonly IValidator<CreatePaymentRequest> _createValidator;
+
+    private readonly IUnitOfWork _unitOfWork;
 
     public PaymentService(
         IPaymentRepository repository,
@@ -28,9 +31,11 @@ public class PaymentService : IPaymentService
         ICustomerRepository customerRepository,
         ISupplierRepository supplierRepository,
         IPeriodLock periodLock,
+        ICashDayLock cashDayLock,
         IAuditLog audit,
         ICurrentUser currentUser,
-        IValidator<CreatePaymentRequest> createValidator)
+        IValidator<CreatePaymentRequest> createValidator,
+        IUnitOfWork unitOfWork)
     {
         _repository = repository;
         _paymentLedger = paymentLedger;
@@ -38,9 +43,11 @@ public class PaymentService : IPaymentService
         _customerRepository = customerRepository;
         _supplierRepository = supplierRepository;
         _periodLock = periodLock;
+        _cashDayLock = cashDayLock;
         _audit = audit;
         _currentUser = currentUser;
         _createValidator = createValidator;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<PagedResult<PaymentListItemDto>> SearchAsync(
@@ -75,45 +82,55 @@ public class PaymentService : IPaymentService
     public async Task<PaymentDto> CreateAsync(
         CreatePaymentRequest request, CancellationToken cancellationToken)
     {
-        _currentUser.Require(Permission.PaymentRecord, "record a payment");
+        // The document number is claimed inside this transaction, so a create that fails
+        // rolls the number back with it rather than leaving a gap in the series.
+        return await _unitOfWork.InTransactionAsync(async () =>
+        {
+            _currentUser.Require(Permission.PaymentRecord, "record a payment");
 
-        await ValidationHelper.ValidateAsync(_createValidator, request, cancellationToken);
-        await _periodLock.GuardAsync(request.PaymentDate, "receipt", cancellationToken);
+            await ValidationHelper.ValidateAsync(_createValidator, request, cancellationToken);
+            await _periodLock.GuardAsync(request.PaymentDate, "receipt", cancellationToken);
 
-        var direction = Parse<PaymentDirection>(request.Direction)
-            ?? throw Invalid("Direction", $"'{request.Direction}' is not a direction this app knows");
+            var mode = Parse<PaymentMode>(request.Mode)
+                ?? throw Invalid("Mode", $"'{request.Mode}' is not a payment mode this app knows");
 
-        var mode = Parse<PaymentMode>(request.Mode)
-            ?? throw Invalid("Mode", $"'{request.Mode}' is not a payment mode this app knows");
+            await _cashDayLock.GuardAsync(
+                request.PaymentDate, "receipt", mode == PaymentMode.Cash, cancellationToken);
 
-        var (customer, supplier) = await LoadPartyAsync(direction, request, cancellationToken);
+            var direction = Parse<PaymentDirection>(request.Direction)
+                ?? throw Invalid("Direction", $"'{request.Direction}' is not a direction this app knows");
 
-        var targets = await ResolveTargetsAsync(direction, request, customer, supplier, cancellationToken);
+            var (customer, supplier) = await LoadPartyAsync(direction, request, cancellationToken);
 
-        var draft = new PaymentDraft(
-            direction,
-            customer,
-            supplier,
-            customer?.Name ?? supplier?.Name ?? request.WalkInName!.Trim(),
-            request.PaymentDate,
-            request.Amount,
-            mode,
-            request.ReferenceNumber,
-            request.Notes,
-            IsCounterPayment: false,
-            request.Cheque is { } cheque
-                ? new ChequeDraft(
-                    cheque.ChequeNumber,
-                    cheque.BankName,
-                    cheque.ChequeDate,
-                    cheque.ReceivedOn ?? request.PaymentDate)
-                : null,
-            targets);
+            var targets = await ResolveTargetsAsync(direction, request, customer, supplier, cancellationToken);
 
-        var payment = await _paymentLedger.ReceiveAsync(draft, cancellationToken);
-        await _repository.SaveChangesAsync(cancellationToken);
+            EnsureRefundFitsTheCredit(direction, customer, supplier, request.Amount);
 
-        return payment.ToDto();
+            var draft = new PaymentDraft(
+                direction,
+                customer,
+                supplier,
+                customer?.Name ?? supplier?.Name ?? request.WalkInName!.Trim(),
+                request.PaymentDate,
+                request.Amount,
+                mode,
+                request.ReferenceNumber,
+                request.Notes,
+                IsCounterPayment: false,
+                request.Cheque is { } cheque
+                    ? new ChequeDraft(
+                        cheque.ChequeNumber,
+                        cheque.BankName,
+                        cheque.ChequeDate,
+                        cheque.ReceivedOn ?? request.PaymentDate)
+                    : null,
+                targets);
+
+            var payment = await _paymentLedger.ReceiveAsync(draft, cancellationToken);
+            await _repository.SaveChangesAsync(cancellationToken);
+
+            return payment.ToDto();
+        }, cancellationToken);
     }
 
     public async Task<PaymentDto> AllocateAsync(
@@ -173,6 +190,8 @@ public class PaymentService : IPaymentService
     public async Task<PaymentSummaryDto> GetSummaryAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
+        _currentUser.Require(Permission.CostView, "see what the shop has collected");
+
         // Money actually in, on the day it was effective. A post-dated cheque is deliberately absent
         // — it is Pending, and counting it would say the shop holds cash it cannot spend.
         var (posted, _) = await _repository.SearchAsync(
@@ -214,6 +233,8 @@ public class PaymentService : IPaymentService
 
     public async Task<DuesSummaryDto> GetDuesAsync(CancellationToken cancellationToken)
     {
+        _currentUser.Require(Permission.CostView, "see what every party owes");
+
         var (customers, _) = await _customerRepository.SearchAsync(
             null, null, page: 1, pageSize: int.MaxValue, cancellationToken);
 
@@ -458,6 +479,47 @@ public class PaymentService : IPaymentService
         {
             payment.Supplier = await _supplierRepository.GetByIdAsync(supplierId, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Money going the wrong way down a party's account is a refund, and a refund cannot be larger
+    /// than the credit the party is holding.
+    /// <para>
+    /// A shop pays a customer only to hand back what a credit note left on their account, and takes
+    /// money from a supplier only for the same reason in reverse. Without this the second refund of
+    /// the same hundred rupees is accepted in silence, and the account quietly flips to the party
+    /// owing the shop money they never borrowed.
+    /// </para>
+    /// <para>
+    /// Refunding <em>on</em> the note itself is a different path with its own limit — this one is
+    /// for the credit still standing afterwards.
+    /// </para>
+    /// </summary>
+    private static void EnsureRefundFitsTheCredit(
+        PaymentDirection direction, Customer? customer, Supplier? supplier, decimal amount)
+    {
+        // A negative outstanding balance means the party is in credit: the shop owes them.
+        var credit = direction switch
+        {
+            PaymentDirection.Paid when customer is not null => -customer.OutstandingBalance,
+            PaymentDirection.Received when supplier is not null => -supplier.OutstandingBalance,
+            _ => (decimal?)null,
+        };
+
+        if (credit is not { } held || amount <= held)
+        {
+            return;
+        }
+
+        var party = customer?.Name ?? supplier?.Name;
+
+        throw Invalid(
+            "Amount",
+            held <= 0
+                ? $"{party} is not owed anything, so there is nothing to hand back. " +
+                  "Raise the credit note first if goods have come back."
+                : $"Only {held:0.00} is standing to {party}'s credit, so {amount:0.00} cannot be " +
+                  "handed back. Refund what is there, or check whether it has already been paid.");
     }
 
     private static ValidationAppException Invalid(string field, string message) =>

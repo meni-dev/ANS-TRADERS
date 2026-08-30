@@ -1,6 +1,6 @@
-import { ApiError } from '@/lib/api/client'
+import { describeError } from '@/lib/api/errors'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { downloadCsv, indexHeaders, parseCsv, toCsv } from '@/lib/csv'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 import {
@@ -9,7 +9,6 @@ import {
   Button,
   Chip,
   FormControlLabel,
-  IconButton,
   Paper,
   Stack,
   Switch,
@@ -111,7 +110,7 @@ export function ProductImportPage() {
     try {
       setPreview(await previewImport.mutateAsync({ rows: parsed, updateExisting }))
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not read that file')
+      setError(describeError(caught, 'Could not read that file'))
     }
   }
 
@@ -133,11 +132,7 @@ export function ProductImportPage() {
       setRows([])
       setFileName(null)
     } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? (Object.values(caught.errors).flat()[0] ?? caught.message)
-          : 'Could not import that file',
-      )
+      setError(describeError(caught, 'Could not import that file'))
     }
   }
 
@@ -145,22 +140,19 @@ export function ProductImportPage() {
 
   return (
     <Stack spacing={2.5}>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-        <IconButton onClick={() => navigate('/products')} aria-label="Back">
-          <ArrowBackIcon />
-        </IconButton>
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Load the catalogue
-          </Typography>
-          <Typography sx={{ fontSize: 13.5, color: 'text.secondary' }}>
-            A spreadsheet of parts. Nothing is saved until you confirm.
-          </Typography>
-        </Box>
-        <Button startIcon={<DownloadOutlinedIcon />} onClick={downloadTemplate}>
+      <PageHeader
+        title="Load the catalogue"
+        icon={<UploadFileOutlinedIcon />}
+        iconTone="teal"
+        caption="A spreadsheet of parts. Nothing is saved until you confirm."
+        onBack={() => navigate('/products')}
+        actions={
+          <Button startIcon={<DownloadOutlinedIcon />} onClick={downloadTemplate}>
           Template
-        </Button>
-      </Stack>
+          </Button>
+        }
+        flush
+      />
 
       {error ? <Alert severity="error">{error}</Alert> : null}
       {done ? <Alert severity="success">{done}</Alert> : null}

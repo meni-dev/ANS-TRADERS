@@ -1,3 +1,9 @@
+import TrendingDownOutlinedIcon from '@mui/icons-material/TrendingDownOutlined'
+import SavingsOutlinedIcon from '@mui/icons-material/SavingsOutlined'
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
+import ErrorOutlineOutlinedIcon from '@mui/icons-material/ErrorOutlineOutlined'
+import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { DataTable } from '@/components/data/DataTable'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { StatTile } from '@/components/data/StatTile'
@@ -210,41 +216,64 @@ export function StockListPage({ lowOnlyByDefault = false }: StockListPageProps) 
 
   return (
     <Box>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-start' }, mb: 2.5 }}
-      >
-        <Box>
-          <Typography variant="h1">{lowOnlyByDefault ? 'Low Stock' : 'Stock'}</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {lowOnlyByDefault
-              ? 'Items at or below their reorder level — what to put on the next supplier order.'
-              : 'What is on the shelf right now. Purchases add to it, invoices take from it.'}
-          </Typography>
-        </Box>
-
-        <Button
-          variant="outlined"
-          startIcon={<SwapVertOutlinedIcon sx={{ fontSize: 18 }} />}
-          onClick={() => navigate('/inventory/stock-ledger')}
-        >
-          Stock Ledger
-        </Button>
-      </Stack>
+      <PageHeader
+        title={lowOnlyByDefault ? 'Low Stock' : 'Stock'}
+        icon={<WarehouseOutlinedIcon />}
+        iconTone="amber"
+        caption={
+          lowOnlyByDefault
+            ? 'Items at or below their reorder level — what to put on the next supplier order.'
+            : 'What is on the shelf right now. Purchases add to it, invoices take from it.'
+        }
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<SwapVertOutlinedIcon sx={{ fontSize: 18 }} />}
+            onClick={() => navigate('/inventory/stock-ledger')}
+          >
+            Stock Ledger
+          </Button>
+        }
+      />
 
       <Grid container spacing={2} sx={{ mb: 2.5 }}>
         <Grid size={{ xs: 6, md: 3 }}>
-          <StatTile label="Items tracked" value={`${summary?.totalItems ?? 0}`} />
+          <StatTile
+            label="Items tracked"
+            value={`${summary?.totalItems ?? 0}`}
+            icon={<Inventory2OutlinedIcon />}
+            iconTone="blue"
+            tinted
+          />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <StatTile label="Low stock" value={`${summary?.lowStockCount ?? 0}`} tone="warning" />
+          <StatTile
+            label="Low stock"
+            value={`${summary?.lowStockCount ?? 0}`}
+            tone="warning"
+            icon={<TrendingDownOutlinedIcon />}
+            iconTone="amber"
+            tinted
+          />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <StatTile label="Out of stock" value={`${summary?.outOfStockCount ?? 0}`} tone="error" />
+          <StatTile
+            label="Out of stock"
+            value={`${summary?.outOfStockCount ?? 0}`}
+            tone="error"
+            icon={<ErrorOutlineOutlinedIcon />}
+            iconTone="rose"
+            tinted
+          />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <StatTile label="Value at cost" value={formatCurrency(summary?.totalStockValue ?? 0)} />
+          <StatTile
+            label="Value at cost"
+            value={formatCurrency(summary?.totalStockValue ?? 0)}
+            icon={<SavingsOutlinedIcon />}
+            iconTone="teal"
+            tinted
+          />
         </Grid>
       </Grid>
 

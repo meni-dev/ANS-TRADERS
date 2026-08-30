@@ -1,4 +1,5 @@
 using Application.DTOs.Invoices;
+using Application.Interfaces;
 using FluentValidation;
 
 namespace Application.Validators.Invoices;
@@ -16,7 +17,7 @@ public class CreateInvoiceItemRequestValidator : AbstractValidator<CreateInvoice
 
 public class CreateInvoiceRequestValidator : AbstractValidator<CreateInvoiceRequest>
 {
-    public CreateInvoiceRequestValidator()
+    public CreateInvoiceRequestValidator(IShopClock clock)
     {
         // Either an account customer or a name for the walk-in. A bill with no one on it cannot be
         // reconciled later, and "Cash" as a default name hides that the shop never captured who bought.
@@ -25,7 +26,7 @@ public class CreateInvoiceRequestValidator : AbstractValidator<CreateInvoiceRequ
             .MaximumLength(200)
             .When(x => x.CustomerId is null);
 
-        RuleFor(x => x.InvoiceDate).DocumentDate();
+        RuleFor(x => x.InvoiceDate).DocumentDate(clock);
 
         RuleFor(x => x.AmountPaid).GreaterThanOrEqualTo(0).WithMessage("Amount paid cannot be negative");
 

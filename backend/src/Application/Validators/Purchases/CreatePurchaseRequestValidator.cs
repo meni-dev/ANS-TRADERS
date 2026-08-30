@@ -1,4 +1,5 @@
 using Application.DTOs.Purchases;
+using Application.Interfaces;
 using FluentValidation;
 
 namespace Application.Validators.Purchases;
@@ -16,7 +17,7 @@ public class CreatePurchaseItemRequestValidator : AbstractValidator<CreatePurcha
 
 public class CreatePurchaseRequestValidator : AbstractValidator<CreatePurchaseRequest>
 {
-    public CreatePurchaseRequestValidator()
+    public CreatePurchaseRequestValidator(IShopClock clock)
     {
         RuleFor(x => x.SupplierId).NotEmpty().WithMessage("Pick a supplier");
 
@@ -24,7 +25,7 @@ public class CreatePurchaseRequestValidator : AbstractValidator<CreatePurchaseRe
             .NotEmpty().WithMessage("Enter the supplier's bill number")
             .MaximumLength(50);
 
-        RuleFor(x => x.InvoiceDate).DocumentDate();
+        RuleFor(x => x.InvoiceDate).DocumentDate(clock);
 
         RuleFor(x => x.AmountPaid).GreaterThanOrEqualTo(0).WithMessage("Amount paid cannot be negative");
 
