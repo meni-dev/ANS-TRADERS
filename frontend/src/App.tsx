@@ -1,5 +1,6 @@
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ApiError } from '@/lib/api/client'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { NotificationProvider } from '@/components/feedback/NotificationProvider'
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -37,7 +38,20 @@ import { StockListPage } from '@/features/stock/components/StockListPage'
 import { SupplierListPage } from '@/features/suppliers/components/SupplierListPage'
 import { theme } from '@/theme/theme'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // A 4xx is an answer, not a blip. Retrying one only makes the screen spin through the
+      // backoff before showing a message the very first reply already carried — a bill that does
+      // not exist sat under a spinner for about sixteen seconds before it said so. A dead
+      // connection arrives as status 0 and still gets a second go.
+      retry: (failureCount, error) =>
+        error instanceof ApiError && error.status >= 400 && error.status < 500
+          ? false
+          : failureCount < 2,
+    },
+  },
+})
 
 function App() {
   return (

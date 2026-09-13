@@ -1,3 +1,4 @@
+import { describeError } from '@/lib/api/errors'
 import { DataTable } from '@/components/data/DataTable'
 import { ConfirmDialog } from '@/components/feedback/ConfirmDialog'
 import { useNotification } from '@/components/feedback/NotificationProvider'
@@ -212,8 +213,11 @@ export function SupplierListPage() {
         notify(`Supplier "${toggleTarget.name}" activated`)
       }
       setToggleTarget(null)
-    } catch {
-      notify('Something went wrong. Please try again.', 'error')
+    } catch (error) {
+      // The server writes these refusals in shop language and names the document standing in the
+      // way — "cancel the credit note first" is the whole answer. Swallowing it left the counter a
+      // line that says nothing and, worse, invites a retry that can never work.
+      notify(describeError(error), 'error')
     }
   }
 

@@ -69,6 +69,21 @@ public class ErrorHandlingMiddleware
                 "Two people saved at the same moment. Nothing was recorded — try again.",
                 "DUPLICATE_KEY");
         }
+        catch (BadHttpRequestException ex)
+        {
+            // The framework rejected the request before any handler saw it — a query parameter
+            // missing, or one that would not parse into the type the route asked for. That is the
+            // caller's mistake, not the shop's server falling over, and reporting it as a 500 sent
+            // whoever was debugging it to the logs to find a sentence the response could have
+            // carried itself.
+            _logger.LogWarning(ex, "Malformed request to {Path}", context.Request.Path);
+
+            await WriteResponse(
+                context,
+                ex.StatusCode is >= 400 and < 500 ? ex.StatusCode : StatusCodes.Status400BadRequest,
+                ex.Message,
+                "BAD_REQUEST");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception");

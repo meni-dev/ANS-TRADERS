@@ -1,3 +1,4 @@
+import { describeError } from '@/lib/api/errors'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { DocumentLinesTable } from '@/components/document/DocumentLinesTable'
@@ -55,8 +56,11 @@ export function PurchaseDetailPage() {
       await cancelPurchase.mutateAsync(purchase.id)
       notify(`Purchase ${purchase.purchaseNumber} cancelled`, 'info')
       setConfirmOpen(false)
-    } catch {
-      notify('Something went wrong. Please try again.', 'error')
+    } catch (error) {
+      // The server writes these refusals in shop language and names the document standing in the
+      // way — "cancel the credit note first" is the whole answer. Swallowing it left the counter a
+      // line that says nothing and, worse, invites a retry that can never work.
+      notify(describeError(error), 'error')
     }
   }
 
@@ -171,6 +175,7 @@ export function PurchaseDetailPage() {
               }}
               isInterState={purchase.isInterState}
               amountPaid={purchase.amountPaid}
+              balanceDue={purchase.balanceDue}
             />
           </Paper>
         </Grid>

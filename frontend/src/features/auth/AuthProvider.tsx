@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { apiRequest } from '@/lib/api/client'
+import { ApiError, apiRequest } from '@/lib/api/client'
 import { getToken, notifySessionExpired, onSessionExpired, setToken } from '@/lib/api/session'
 import { signIn as signInRequest, signOut as signOutRequest } from './api'
 import type { Permission, SignedInUser } from './types'
@@ -37,10 +37,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       setUser(await apiRequest<SignedInUser>('/api/auth/me'))
-    } catch {
-      // The client has already cleared the token on a 401; anything else means the server is
-      // unreachable, and either way there is nobody to show a screen to.
-      notifySessionExpired()
+    } catch (error) {
+      // A 401 has already cleared the token inside the client, and saying so again here costs
+      // nothing. An unreachable server is a different thing and used to be treated the same: the
+      // token was thrown away, so a server that was merely restarting signed the counter out for
+      // good, and the one screen left to explain it was a login form that could not reach the
+      // server either. The token is still valid — keep it, so coming back is a reload.
+      if (!(error instanceof ApiError && error.code === 'NETWORK_UNREACHABLE')) {
+        notifySessionExpired()
+      }
+
+      setUser(null)
     }
   }, [])
 

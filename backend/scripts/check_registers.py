@@ -175,11 +175,16 @@ b3 = reg("gstr3b")
 i3 = b3["idx"]
 row = {r[i3["line"]]: r for r in b3["rows"]}
 out = row["Outward taxable supplies"]
-check("GSTR-3B: outward line equals the sales register",
-      D(out[i3["taxable"]]) == total(sales, "taxable")
+# 3.1(a) carries only the taxable part of a bill; a nil-rated or exempt line on the same bill sits
+# on 3.1(c) instead. The sales register knows no such split, so the two lines have to be put back
+# together before they can be compared with it. Table 8 is the figure to add: it is the same gross
+# nil/exempt turnover, straight off the invoices, whereas the 3.1(c) row is already net of the
+# credit notes that the "Less: credit notes issued" line accounts for separately.
+check("GSTR-3B: outward, taxable plus nil-rated, equals the sales register",
+      D(out[i3["taxable"]]) + untaxed == total(sales, "taxable")
       and D(out[i3["cgst"]]) == total(sales, "cgst")
       and D(out[i3["igst"]]) == total(sales, "igst"),
-      f"{out[i3['taxable']]} vs {total(sales,'taxable')}")
+      f"{out[i3['taxable']]} taxable + {untaxed} nil/exempt vs {total(sales,'taxable')}")
 
 itc = row["Input tax credit — all other ITC"]
 purchase = reg("purchase")

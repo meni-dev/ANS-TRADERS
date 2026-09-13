@@ -1,3 +1,4 @@
+import { describeError } from '@/lib/api/errors'
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { BalanceChip, DocumentStatusChip } from '@/components/document/DocumentStatusChip'
@@ -49,8 +50,11 @@ export function InvoiceDetailPage() {
       await cancelInvoice.mutateAsync(invoice.id)
       notify(`Invoice ${invoice.invoiceNumber} cancelled`, 'info')
       setConfirmOpen(false)
-    } catch {
-      notify('Something went wrong. Please try again.', 'error')
+    } catch (error) {
+      // The server writes these refusals in shop language and names the document standing in the
+      // way — "cancel the credit note first" is the whole answer. Swallowing it left the counter a
+      // line that says nothing and, worse, invites a retry that can never work.
+      notify(describeError(error), 'error')
     }
   }
 

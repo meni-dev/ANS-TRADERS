@@ -7,6 +7,13 @@ type DocumentTotalsProps = {
   isInterState: boolean
   /** Shown under the grand total once a payment mode has been chosen. */
   amountPaid?: number
+  /**
+   * What the server says is still owed. A saved document has one and it is the figure to print: a
+   * cancelled bill is owed nothing, while total less paid still reads as the whole amount and put
+   * "Balance due ₹2,432.00" on a bill the supplier ledger had already let go of. A form has no
+   * server figure yet, so it leaves this out and the subtraction below stands in.
+   */
+  balanceDue?: number
 }
 
 function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
@@ -33,8 +40,9 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
  * The tax summary that closes every document. IGST and CGST+SGST are mutually exclusive by law, so
  * only the applicable pair is shown — printing both with one side zeroed is how bills get queried.
  */
-export function DocumentTotals({ amounts, isInterState, amountPaid }: DocumentTotalsProps) {
-  const balance = amountPaid === undefined ? undefined : amounts.grandTotal - amountPaid
+export function DocumentTotals({ amounts, isInterState, amountPaid, balanceDue }: DocumentTotalsProps) {
+  const balance =
+    balanceDue ?? (amountPaid === undefined ? undefined : amounts.grandTotal - amountPaid)
 
   return (
     <Stack spacing={1}>

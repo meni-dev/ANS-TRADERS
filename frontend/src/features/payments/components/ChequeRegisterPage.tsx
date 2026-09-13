@@ -1,7 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DataTable } from '@/components/data/DataTable'
 import { formatCurrency, formatDate, todayIso } from '@/lib/format'
-import { Alert, Button, Chip, Stack, Tab, Tabs, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, Stack, Tab, Tabs, Typography } from '@mui/material'
 import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid'
 import { useMemo, useState } from 'react'
 import { BounceChequeDialog } from './BounceChequeDialog'

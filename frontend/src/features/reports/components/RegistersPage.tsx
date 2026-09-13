@@ -212,8 +212,8 @@ export function RegistersPage() {
         caption={
           // Counted, not written down. The last hard-coded number went stale the day a register
           // was added and told the shop it had one fewer than it did.
-          summaries.length > 0
-            ? `${summaries.length} registers, each one downloadable as a spreadsheet for the accountant.`
+          registers && registers.length > 0
+            ? `${registers.length} registers, each one downloadable as a spreadsheet for the accountant.`
             : 'Every register, downloadable as a spreadsheet for the accountant.'
         }
         flush
@@ -227,7 +227,10 @@ export function RegistersPage() {
           select
           size="small"
           label="Register"
-          value={selected}
+          // Empty until the list arrives. The picker starts on "sales", but for the render or two
+          // before the registers load there is no option by that name to select, and MUI warns
+          // about a value it cannot offer.
+          value={groups.length > 0 ? selected : ''}
           onChange={(event) => setSelected(event.target.value)}
           sx={{ minWidth: 280 }}
         >
