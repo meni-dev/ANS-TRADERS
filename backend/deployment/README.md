@@ -64,21 +64,38 @@ dotnet lambda deploy-function
 Everything it needs is in `aws-lambda-tools-defaults.json` next to the project, so the command takes
 no flags. Two of those settings are worth understanding rather than copying.
 
-### Why `provided.al2023` and not `dotnet10`
+### Why the managed `dotnet10` runtime
 
-AWS's managed .NET runtimes follow the LTS releases and lag behind them. This project targets
-**net10.0**, so rather than wait for a managed runtime to appear, the app ships its own copy of .NET
-inside the deployment bundle — that is what `--self-contained true` in `msbuild-parameters` does, and
-it is the supported way to run a .NET version Lambda does not manage.
+This used to deploy onto `provided.al2023` carrying its own copy of .NET, because when it was
+written net10.0 had no managed runtime to land on. It has one now — Amazon Linux 2023, deprecation
+November 2028, on both architectures — and moving to it is worth doing for a reason that has nothing
+to do with tidiness:
 
-**This is not what a Lambda layer is for.** Layers are how Node and Python projects share
-dependencies between functions; a .NET deployment already carries everything it needs in one bundle,
-so there is no layer here and nothing missing by its absence.
+| Build | Unzipped | Zipped |
+|---|---|---|
+| self-contained + ReadyToRun | 144MB | **54MB** |
+| self-contained, no ReadyToRun | 126MB | 47.9MB |
+| **framework-dependent + ReadyToRun** | 31MB | **10.2MB** |
+| framework-dependent, no ReadyToRun | 12MB | 4.2MB |
 
-Check whether a managed `dotnet10` runtime exists in your region before you deploy. If it does, you
-can drop `--self-contained true` and set `"function-runtime": "dotnet10"` with the handler back to
-`Api::Api.LambdaEntryPoint::FunctionHandlerAsync` — smaller bundle, faster cold start, but AWS
-patches the runtime on their schedule rather than yours.
+**Lambda refuses a direct upload over 50MB.** The self-contained bundle was over it, so every deploy
+had to route through an S3 bucket — a bucket, a policy and a flag to keep alive for no gain.
+Dropping ReadyToRun would have squeezed under at 47.9MB, with 2MB of headroom and a worse cold
+start. Framework-dependent removes the question.
+
+The trade is that AWS patches a managed runtime on their schedule rather than yours. Against a fifth
+of the bundle size, shorter cold starts and one less moving part, it is the better side of the deal
+for one shop.
+
+**The handler does not change.** The app uses top-level statements with `AddAWSLambdaHosting`, which
+is the executable-assembly model, and AWS supports that model on the managed runtimes — the handler
+stays the bare assembly name `Api`. It does **not** need `Assembly::Type::Method`, and there is no
+`LambdaEntryPoint` class in this project to point at. (An earlier version of this page said
+otherwise. It was wrong.)
+
+ReadyToRun stays on. Framework-dependent, it pre-compiles this app's own assemblies rather than the
+shared framework — 6MB for taking the JIT off the cold path, which is what the first sign-in of the
+day feels.
 
 ### Memory and auth
 
@@ -164,6 +181,77 @@ export ANS_DATABASE_URL="<connection string>"
 The verify step restores into the local Docker Postgres, whatever the dump came from — which is the
 stronger test, because it proves the dump can be brought back somewhere other than where it was
 made. See `scripts/README.md`.
+
+---
+
+## Deploying from GitHub Actions
+
+Two workflows in `.github/workflows/`:
+
+| File | When | What |
+|---|---|---|
+| `ci.yml` | every branch and PR | backend tests, frontend lint and type-check |
+| `deploy.yml` | push to `main`, or by hand | test → **approval** → migrate → API → UI → verify |
+
+`deploy.yml` waits on the `production` environment, so nothing reaches the shop until somebody
+presses approve. Set that up once in **Settings → Environments → production → Required reviewers**;
+without a reviewer the environment exists but the gate does nothing.
+
+Order inside the deploy job is deliberate: the migration runs first, on the **direct** connection,
+so the function wakes up to the schema it was built against and a failed migration stops the deploy
+instead of taking a running shop down.
+
+### No S3 bucket, no ECR
+
+At about 10MB the bundle uploads directly, so `deploy-function` needs nothing but credentials and a
+region. If you ever go back to a self-contained build, read the runtime section above first — that
+is the change that puts the zip over Lambda's 50MB direct-upload limit and drags an S3 bucket back
+into the deploy.
+
+### Secrets and variables
+
+**Secrets** — Settings → Secrets and variables → Actions → Secrets:
+
+| Name | What |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | deploy user's key |
+| `AWS_SECRET_ACCESS_KEY` | deploy user's secret |
+| `DB_CONNECTION_DIRECT` | **direct** connection string — migrations only |
+| `DB_CONNECTION_POOLED` | **pooled** connection string — the register check |
+| `CLOUDFLARE_API_TOKEN` | token with Pages:Edit |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
+
+**Variables** — the same page, Variables tab. These are not credentials and are worth being able to
+read at a glance:
+
+| Name | Example |
+|---|---|
+| `AWS_REGION` | `ap-south-1` |
+| `CF_PAGES_PROJECT` | `ans-traders` |
+| `VITE_API_BASE_URL` | `https://api.your-domain.com` |
+| `API_URL` | `https://api.your-domain.com` |
+| `APP_URL` | `https://your-domain.com` |
+
+### What the workflow deliberately does not do
+
+**It never sets the function's environment variables.** `--environment-variables` replaces the whole
+environment rather than merging into it, so a workflow that passed a partial set would silently drop
+the connection string. `ConnectionStrings__Default`, `Cors__AllowedOrigins__0` and `Shop__TimeZone`
+are set once in the console and left alone.
+
+**It never creates the owner account.** `--create-owner` prints a password once, and a workflow log
+is not where that belongs. Run it from a terminal.
+
+**It does not roll back.** A migration that fails stops the deploy before the function is touched,
+which is the case worth protecting. A bad deploy that gets through is rolled back by deploying the
+previous commit — and if the migration was the problem, from the backup.
+
+### The verify step
+
+After the deploy, `check-registers.sh` runs against production. It is read-only: it mints a
+short-lived session row, reads every register through the API, and removes it. A failure here means
+the deploy went out and the books disagree with themselves — read the named check before doing
+anything else.
 
 ---
 

@@ -1,0 +1,153 @@
+# Production deploy. Everything before the `deploy` job runs without touching the shop; the deploy
+# job itself sits behind the `production` environment, so it waits for a human to press approve.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time. Two overlapping runs would race each other through the same migration, and
+# the second would deploy a function built from the first one's schema assumptions.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    # The approval gate. Configure required reviewers on this environment in
+    # Settings → Environments → production.
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('backend/**/*.csproj') }}
+          restore-keys: nuget-
+
+      # ---------------------------------------------------------------- schema first
+      #
+      # A deploy step, never a startup step: several cold Lambdas start at once and would race each
+      # other through the same migration. It runs before the new code so the schema the function
+      # wakes up to is the one it was built against, and a migration that fails stops the deploy
+      # rather than taking a running shop down.
+      #
+      # The DIRECT connection string, not the pooled one — DDL and transaction pooling do not mix.
+      - name: Migrate the database
+        working-directory: backend
+        env:
+          ConnectionStrings__Default: ${{ secrets.DB_CONNECTION_DIRECT }}
+        run: dotnet run --project src/Api --configuration Release -- --migrate
+
+      # ---------------------------------------------------------------- API
+      - name: Install Lambda tools
+        run: dotnet tool install -g Amazon.Lambda.Tools
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # aws-lambda-tools-defaults.json names `"profile": "default"`, which is the right thing on a
+      # laptop and the wrong thing on a runner that has no profile file at all — the tool looks the
+      # profile up before it ever considers the environment variables the step above exported, and
+      # fails saying it cannot find credentials. Writing the profile satisfies both without the
+      # defaults file having to know where it is running.
+      - name: Give the Lambda tools a default profile
+        run: |
+          mkdir -p ~/.aws
+          cat > ~/.aws/credentials <<EOF
+          [default]
+          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
+          chmod 600 ~/.aws/credentials
+
+      # Everything the deploy needs — the dotnet10 runtime, arm64, memory, timeout, the bare
+      # assembly-name handler — comes from aws-lambda-tools-defaults.json next to the project, so it
+      # is reviewed in the repo rather than remembered as a flag. The bundle is about 10MB and goes
+      # straight up; there is no S3 bucket in this path.
+      #
+      # No --environment-variables on purpose. That flag REPLACES the function's whole environment,
+      # so passing a partial set here would silently drop the connection string. They are set once
+      # in the console and left alone.
+      - name: Deploy the API
+        working-directory: backend/src/Api
+        run: dotnet lambda deploy-function --region "${{ vars.AWS_REGION }}"
+
+      # ---------------------------------------------------------------- UI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the UI
+        working-directory: frontend
+        env:
+          # Read at BUILD time and inlined into the bundle — changing it needs a rebuild, not a
+          # restart, which is why it lives here and not in a Pages runtime setting.
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy the UI
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: frontend
+          command: pages deploy dist --project-name=${{ vars.CF_PAGES_PROJECT }} --branch=main
+
+  verify:
+    name: Verify the books
+    needs: deploy
+    runs-on: ubuntu-latest
+    # No `environment:` here on purpose. A job that names an environment with required reviewers
+    # asks for approval of its own, and being made to approve twice for one deploy teaches people
+    # to click through both. The secrets it needs are repository secrets, so it can read them
+    # without claiming the environment.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ vars.API_URL }}/health" || true)
+            if [ "$code" = "200" ]; then echo "API is up"; exit 0; fi
+            sleep 5
+          done
+          echo "The API did not answer /health within about two and a half minutes."
+          exit 1
+
+      # Reads every register through the API and asserts what a person would assume without being
+      # told — that a bill's total is its cash plus its credit note plus what is still owed, that
+      # GSTR-1 and 3B add back to the sales register, that the stock ledger's closing balance is
+      # what the shelf holds. Read-only: it mints a short-lived session row, reads, and removes it.
+      #
+      # The pooled connection is right here — this is ordinary traffic, not DDL.
+      - name: Check the registers
+        env:
+          ANS_API: ${{ vars.API_URL }}
+          ANS_DATABASE_URL: ${{ secrets.DB_CONNECTION_POOLED }}
+        working-directory: backend
+        run: ./scripts/check-registers.sh

@@ -3,22 +3,32 @@
     "Defaults for `dotnet lambda deploy-function`, so the deploy is one command rather than a line",
     "of flags somebody has to remember correctly.",
     "",
-    "The runtime is provided.al2023, not dotnetNN. AWS's managed .NET runtimes follow the LTS",
-    "releases and lag them; this project targets net10.0, so rather than wait for a managed runtime",
-    "to appear the app ships its own copy of .NET inside the bundle. That is what --self-contained",
-    "does, and it is the supported way to run a .NET version Lambda does not manage.",
+    "The runtime is dotnet10, which AWS manages. This file used to say provided.al2023 with",
+    "--self-contained, from back when net10.0 had no managed runtime to deploy onto. It does now",
+    "(Amazon Linux 2023, deprecation Nov 2028), and carrying our own copy of .NET was costing more",
+    "than it bought: the self-contained arm64 bundle zipped to 54MB, and Lambda refuses a direct",
+    "upload over 50MB, so every deploy needed an S3 bucket to go through. Framework-dependent it is",
+    "10MB and uploads straight.",
     "",
-    "It also means the runtime never changes underneath the shop. A managed runtime is patched by",
-    "AWS on their schedule; this one moves when you rebuild.",
+    "The trade is real but small: AWS patches a managed runtime on their schedule rather than ours.",
+    "Against that, the bundle is a fifth of the size, cold starts are shorter, and there is one less",
+    "piece of deployment plumbing to keep alive.",
     "",
-    "For a custom runtime the handler is the assembly name, not Type::Method."
+    "The handler stays the bare assembly name. The app uses top-level statements with",
+    "AddAWSLambdaHosting, which is the executable-assembly model, and that model is supported on the",
+    "managed runtimes too - it does not need an Assembly::Type::Method handler or a LambdaEntryPoint",
+    "class, and there is no such class here.",
+    "",
+    "ReadyToRun stays. On a framework-dependent build it pre-compiles this app's own assemblies, not",
+    "the shared framework, so it costs 6MB and still takes the JIT off the cold path - which is what",
+    "the first sign-in of the day feels, PBKDF2 at 600k iterations."
   ],
 
   "profile": "default",
   "region": "ap-south-1",
 
   "function-name": "ans-api",
-  "function-runtime": "provided.al2023",
+  "function-runtime": "dotnet10",
   "function-handler": "Api",
 
   "// architecture": "Graviton — cheaper per millisecond, and the build container here is arm64 already",
@@ -34,7 +44,7 @@
   "// function-url-auth-type": "NONE is right: every route except sign-in and health is refused by the app's own session check, exactly as it is locally.",
   "function-url-auth-type": "NONE",
 
-  "msbuild-parameters": "--self-contained true -p:PublishReadyToRun=true",
+  "msbuild-parameters": "-p:PublishReadyToRun=true",
 
   "// environment-variables": "Set these in the console or with --environment-variables; they are not kept here because the connection string is a credential.",
 
