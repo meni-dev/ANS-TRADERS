@@ -291,6 +291,7 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
                       <Box component="span">
                         <IconButton
                           size="small"
+                          color="error"
                           onClick={() => remove(index)}
                           disabled={fields.length === 1}
                           aria-label={`Remove line ${index + 1}`}

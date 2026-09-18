@@ -215,11 +215,16 @@ export const theme = createTheme({
 
     MuiIconButton: {
       styleOverrides: {
-        root: {
+        // A plain function so the neutral grey only applies when nothing else was asked for —
+        // written as an object, it wins the cascade over color="error"/"primary"/etc and mutes
+        // every explicitly coloured icon button back to grey.
+        root: ({ ownerState }) => ({
           borderRadius: 6,
-          color: neutral[500],
-          '&:hover': { backgroundColor: neutral[100], color: neutral[800] },
-        },
+          ...(ownerState.color === 'default' && {
+            color: neutral[500],
+            '&:hover': { backgroundColor: neutral[100], color: neutral[800] },
+          }),
+        }),
       },
     },
 
