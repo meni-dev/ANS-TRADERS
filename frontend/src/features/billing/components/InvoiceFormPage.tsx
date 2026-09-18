@@ -1,24 +1,26 @@
 import { describeError } from '@/lib/api/errors'
 import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { PanelCard } from '@/components/data/PanelCard'
+import { DocumentFormLayout } from '@/components/document/DocumentFormLayout'
 import { DocumentTotals } from '@/components/document/DocumentTotals'
 import { LineItemsEditor } from '@/components/document/LineItemsEditor'
+import { PaymentPanel } from '@/components/document/PaymentPanel'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { FormSection } from '@/components/form/FormSection'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
-import { RHFSelectField } from '@/components/form/RHFSelectField'
 import { RHFTextField } from '@/components/form/RHFTextField'
 import { useShopSettings } from '@/features/settings/hooks'
 import { CustomerPicker } from '@/features/customers/components/CustomerPicker'
 import { CustomerCreditStrip } from '@/features/payments/components/CustomerCreditStrip'
 import type { CustomerDto } from '@/features/customers/types'
 import { applyBillDiscount, computeDocument, isInterState as computeIsInterState } from '@/lib/documents/gst'
-import { emptyLine, PAYMENT_MODES, type DocumentLineValues } from '@/lib/documents/types'
+import { emptyLine, type DocumentLineValues } from '@/lib/documents/types'
 import { todayIso } from '@/lib/format'
 import { zodResolver } from '@hookform/resolvers/zod'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
-import { Alert, Box, Button, Chip, Grid, Paper, Stack, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, Grid, Stack, Tooltip, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { FormProvider, useForm, useWatch } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
@@ -121,129 +123,108 @@ export function InvoiceFormPage() {
           )}
           <FormErrorSummary />
 
-          <FormSection
-            title="Bill To"
-            caption="Pick a saved customer, or just type a name for a walk-in."
-          >
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 5 }}>
-                <CustomerPicker
-                  value={customer}
-                  onChange={handleCustomerChange}
-                  helperText="Leave empty for a walk-in"
-                />
-                {/* Warns, never blocks: who gets credit is the owner's call, and a screen that
-                    refuses him is a screen he learns to work around. */}
-                <CustomerCreditStrip
-                  customerId={customer?.id}
-                  currentBillTotal={amounts.grandTotal}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <RHFTextField
-                  name="walkInName"
-                  label="Walk-in Name"
-                  disabled={!!customer}
-                  placeholder="Name on the bill"
-                  helperText={customer ? 'Using the saved customer above' : undefined}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <RHFTextField
-                  name="invoiceDate"
-                  label="Invoice Date"
-                  type="date"
-                  required
-                />
-              </Grid>
-            </Grid>
-
-            <Stack direction="row" spacing={1} sx={{ mt: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
-              <Chip
-                size="small"
-                label={isInterState ? 'Inter-state · IGST' : 'Intra-state · CGST + SGST'}
-                sx={{ bgcolor: 'primary.light', color: 'primary.dark' }}
-              />
-              <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
-                {customer?.gstin
-                  ? `GSTIN ${customer.gstin}`
-                  : 'Unregistered — B2C supply, no GSTIN on the bill'}
-                {customer?.state && ` · ${customer.state}`}
-              </Typography>
-              <Tooltip
-                title={`Decided by comparing the customer's state code with yours (${shop?.stateCode ?? '—'}). A walk-in with no state on file is billed as local.`}
+          <DocumentFormLayout
+            totals={
+              <PanelCard
+                title="Totals"
+                footer={
+                  <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+                    Figures are recalculated on the server when you save.
+                  </Typography>
+                }
               >
-                <InfoOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
-              </Tooltip>
-            </Stack>
-          </FormSection>
-
-          <FormSection title="Items" caption="Rates default to the item master's selling rate. You can only bill what is in stock.">
-            <LineItemsEditor rateSource="sellingRate" isInterState={isInterState} showStock />
-          </FormSection>
-
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid size={{ xs: 12, md: 7 }}>
-              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '8px', height: '100%' }}>
-                <Typography variant="overline" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
-                  Payment
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <RHFSelectField name="paymentMode" label="Payment Mode" options={[...PAYMENT_MODES]} />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    {/* Spread across the lines before tax, so GST is charged on what was actually
-                        taken — see applyBillDiscount. */}
-                    <RHFNumberField
-                      name="billDiscountAmount"
-                      label="Discount on the bill"
-                      helperText="A flat amount off the whole bill"
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <RHFNumberField
-                      name="amountPaid"
-                      label="Amount Received"
-                      disabled={!isCredit}
-                      helperText={
-                        isCredit
-                          ? 'Part payment is fine — the rest goes on account'
-                          : 'Settled in full at the counter'
-                      }
-                    />
-                  </Grid>
-                  <Grid size={12}>
-                    <RHFTextField
-                      name="notes"
-                      label="Notes"
-                      multiline
-                      minRows={2}
-                      placeholder="Optional — printed on the bill"
-                    />
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: '8px', height: '100%' }}>
-                <Typography variant="overline" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
-                  Totals
-                </Typography>
                 <DocumentTotals
                   amounts={amounts}
                   isInterState={isInterState}
                   amountPaid={Number(amountPaid) || 0}
                 />
-                <Typography sx={{ fontSize: 11.5, color: 'text.disabled', mt: 2 }}>
-                  Figures are recalculated on the server when you save.
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
+              </PanelCard>
+            }
+            payment={
+              <PaymentPanel
+                extraField={
+                  // Spread across the lines before tax, so GST is charged on what was actually
+                  // taken — see applyBillDiscount.
+                  <RHFNumberField
+                    name="billDiscountAmount"
+                    label="Discount on the bill"
+                    helperText="A flat amount off the whole bill"
+                  />
+                }
+                amountPaidDisabled={!isCredit}
+                amountPaidHelperText={
+                  isCredit
+                    ? 'Part payment is fine — the rest goes on account'
+                    : 'Settled in full at the counter'
+                }
+                amountPaidLabel="Amount Received"
+                notesPlaceholder="Optional — printed on the bill"
+              />
+            }
+          >
+            <FormSection
+              title="Bill To"
+              caption="Pick a saved customer, or just type a name for a walk-in."
+            >
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: 5 }}>
+                  <CustomerPicker
+                    value={customer}
+                    onChange={handleCustomerChange}
+                    helperText="Leave empty for a walk-in"
+                  />
+                  {/* Warns, never blocks: who gets credit is the owner's call, and a screen that
+                      refuses him is a screen he learns to work around. */}
+                  <CustomerCreditStrip
+                    customerId={customer?.id}
+                    currentBillTotal={amounts.grandTotal}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <RHFTextField
+                    name="walkInName"
+                    label="Walk-in Name"
+                    disabled={!!customer}
+                    placeholder="Name on the bill"
+                    helperText={customer ? 'Using the saved customer above' : undefined}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <RHFTextField
+                    name="invoiceDate"
+                    label="Invoice Date"
+                    type="date"
+                    required
+                  />
+                </Grid>
+              </Grid>
 
-          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+              <Stack direction="row" spacing={1} sx={{ mt: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
+                <Chip
+                  size="small"
+                  label={isInterState ? 'Inter-state · IGST' : 'Intra-state · CGST + SGST'}
+                  sx={{ bgcolor: 'primary.light', color: 'primary.dark' }}
+                />
+                <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+                  {customer?.gstin
+                    ? `GSTIN ${customer.gstin}`
+                    : 'Unregistered — B2C supply, no GSTIN on the bill'}
+                  {customer?.state && ` · ${customer.state}`}
+                </Typography>
+                <Tooltip
+                  title={`Decided by comparing the customer's state code with yours (${shop?.stateCode ?? '—'}). A walk-in with no state on file is billed as local.`}
+                >
+                  <InfoOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+                </Tooltip>
+              </Stack>
+            </FormSection>
+
+            <FormSection title="Items" caption="Rates default to the item master's selling rate. You can only bill what is in stock.">
+              <LineItemsEditor rateSource="sellingRate" isInterState={isInterState} showStock />
+            </FormSection>
+          </DocumentFormLayout>
+
+          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end', mt: 2.5 }}>
             <Button variant="outlined" onClick={() => navigate('/billing')} disabled={createInvoice.isPending}>
               Cancel
             </Button>
