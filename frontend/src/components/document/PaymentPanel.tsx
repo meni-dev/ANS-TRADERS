@@ -29,9 +29,13 @@ export function PaymentPanel({
   notesPlaceholder,
 }: PaymentPanelProps) {
   return (
+    // One field per row rather than the sm:6 pairing an earlier, wider sidebar used: a fixed
+    // ~360px column halves to under 160px per field, which is enough width for the input itself
+    // but not for its helper text ("A flat amount off the whole bill" and the like), which then
+    // wraps to two or three cramped lines. Full width fits nearly all of it on one line instead.
     <PanelCard title="Payment">
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6 }}>
+        <Grid size={12}>
           <RHFSelectField
             name="paymentMode"
             label="Payment Mode"
@@ -40,8 +44,8 @@ export function PaymentPanel({
             id="payment-mode-trigger"
           />
         </Grid>
-        {extraField && <Grid size={{ xs: 12, sm: 6 }}>{extraField}</Grid>}
-        <Grid size={{ xs: 12, sm: 6 }}>
+        {extraField && <Grid size={12}>{extraField}</Grid>}
+        <Grid size={12}>
           <RHFNumberField
             name="amountPaid"
             label={amountPaidLabel}
