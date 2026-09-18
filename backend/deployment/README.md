@@ -6,49 +6,133 @@ Three pieces, none of which know about each other beyond a URL:
 |---|---|---|
 | API | AWS Lambda, behind a Function URL | `dotnet lambda deploy-function` |
 | UI | Cloudflare Pages | Pages build from the repo |
-| Database | Neon or Supabase | managed |
+| Database | Postgres on our own EC2 box | see below |
 
 A Cloudflare Worker puts `api.<your-domain>` in front of the Function URL. There is no API Gateway.
 
+The database is self-hosted rather than a managed Neon/Supabase instance — full control, no
+free-tier cold-start-after-inactivity, and no third account holding the shop's data. The trade is
+real: patching, backups and connection pooling are now ours to run, not someone else's. Sections 1
+and 3 below cover what that costs in setup; section 6 covers what it costs in ongoing care.
+
 ---
 
-## 1. Database
+## 1. Database — Postgres on EC2
 
-Create the database, then take the **pooled** connection string — not the direct one.
+### Why the instance has no public IP
 
-- **Neon** — the endpoint with `-pooler` in the host
-- **Supabase** — port **6543**, not 5432
+Nothing about this box needs to be reachable from the open internet, and the moment it is, it is
+someone else's problem too. Instead, the EC2 instance and the Lambda function sit in the **same
+VPC**, talking over private IPs only:
 
-Lambda scales by running more copies of itself, and each copy opens its own pool. Twenty concurrent
-invocations against a direct connection will exhaust a small Postgres in seconds. The pooler is what
-stands between the shop and that.
+- The DB's security group allows inbound 5432/6432 **only from the Lambda function's security
+  group** — not from `0.0.0.0/0`, not from "my IP."
+- Lambda gets no internet access this way (no NAT gateway means no outbound route), which is fine:
+  this API never calls anything external — no email, no SMS, no third-party API. If that ever
+  changes, a NAT gateway is the fix, not opening the database up.
+- Nobody SSHes in either. The instance gets an IAM role with `AmazonSSMManagedInstanceCore` and is
+  reached through **AWS Systems Manager Session Manager** — no key pair to lose, no port 22 open,
+  and every session is logged in CloudTrail.
 
-Both poolers run PgBouncer in **transaction mode**, which does not keep prepared statements between
-statements. Npgsql prepares automatically, so it has to be told not to:
+### Launch it
+
+- **AMI**: Ubuntu 24.04 LTS, arm64 (matches the Lambda function's Graviton architecture — no
+  connection to performance, just one fewer thing to keep track of)
+- **Instance type**: `t4g.small` (2 vCPU, 2GB). Postgres and PgBouncer for one shop's traffic do not
+  need more; `t4g.micro`'s 1GB is too tight once the OS and both services are running at once
+- **Storage**: 20GB gp3 to start — a spare-parts shop's transaction history is small; resize later
+  if it ever matters
+- **Network**: your default VPC is fine. Auto-assign public IP → **disabled**
+- **IAM role**: a new role with `AmazonSSMManagedInstanceCore` attached, so Session Manager works
+- **Security group** (`ans-db-sg`): no inbound rules yet — add the Lambda rule once that security
+  group exists in section 3
+
+### Install Postgres and PgBouncer
+
+Connect with `aws ssm start-session --target <instance-id>`, then:
+
+```bash
+sudo apt update
+sudo apt install -y postgresql postgresql-contrib pgbouncer docker.io awscli
+
+sudo -u postgres createuser --pwprompt ans_app         # the app's own login, not postgres itself
+sudo -u postgres createdb --owner=ans_app two_wheeler_spare_parts
+```
+
+Postgres listens on the private network only — edit `/etc/postgresql/16/main/postgresql.conf`:
 
 ```
-Host=<pooled-host>;Port=6543;Database=postgres;Username=<user>;Password=<pass>;
-SSL Mode=Require;Trust Server Certificate=true;
+listen_addresses = 'localhost'   # PgBouncer is the only thing that talks to Postgres directly
+```
+
+PgBouncer is what Lambda actually connects to, in **transaction pooling mode** — the same reason
+Neon and Supabase front their own Postgres with a pooler: Lambda scales by running more copies of
+itself, and each copy opens its own connection. Twenty concurrent invocations against Postgres
+directly will exhaust it in seconds; PgBouncer is what stands between the shop and that.
+`/etc/pgbouncer/pgbouncer.ini`:
+
+```ini
+[databases]
+two_wheeler_spare_parts = host=127.0.0.1 port=5432 dbname=two_wheeler_spare_parts
+
+[pgbouncer]
+listen_addr = 0.0.0.0
+listen_port = 6432
+auth_type = scram-sha-256
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 200
+default_pool_size = 10
+```
+
+```bash
+echo "\"ans_app\" \"<the password you set above>\"" | sudo tee /etc/pgbouncer/userlist.txt
+sudo systemctl enable --now postgresql pgbouncer
+```
+
+### The connection string
+
+Points at PgBouncer's port (6432), on the instance's **private** IP — nothing outside the VPC can
+reach it regardless:
+
+```
+Host=<ec2-private-ip>;Port=6432;Database=two_wheeler_spare_parts;Username=ans_app;Password=<pass>;
+SSL Mode=Disable;
 Max Auto Prepare=0;No Reset On Close=true;
 Maximum Pool Size=2;Timeout=15;Command Timeout=30
 ```
 
-`Max Auto Prepare=0` is not optional — leave it out and queries fail intermittently, only under
-load, with an error about a prepared statement that already exists. `Maximum Pool Size=2` keeps each
-Lambda modest, because the number that matters is this multiplied by your concurrency limit.
+`SSL Mode=Disable` is deliberate here and would not be on a managed database: the traffic never
+leaves AWS's private network, so TLS is buying nothing a stricter security group is not already
+buying. `Max Auto Prepare=0` still is not optional — PgBouncer's transaction mode does not keep
+prepared statements between statements, and Npgsql prepares automatically unless told not to.
 
 ## 2. Migrations — a deploy step, not a startup step
 
+The instance has no public IP, so a laptop cannot reach port 6432 directly. Open a tunnel through
+Session Manager first — this needs nothing on the instance beyond the SSM agent already installed
+as part of Ubuntu, and nothing on the laptop beyond the AWS CLI:
+
 ```bash
-cd backend/src/Api
-ConnectionStrings__Default="<connection string>" dotnet run -- --migrate
+aws ssm start-session \
+  --target <instance-id> \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["5432"],"localPortNumber":["5432"]}'
 ```
 
-Never on the way up. Several cold Lambdas start at once and would race each other through the same
-migration, and a schema change that fails should stop a deploy rather than take a running shop down.
+Leave that running in its own terminal, then migrate against `localhost` in another one:
 
-Use the **direct** connection string here, not the pooled one — DDL and transaction pooling do not
-mix well.
+```bash
+cd backend/src/Api
+ConnectionStrings__Default="Host=localhost;Port=5432;Database=two_wheeler_spare_parts;Username=ans_app;Password=<pass>;SSL Mode=Disable" \
+  dotnet run -- --migrate
+```
+
+Never on the way up, and never through PgBouncer — both for the same reason: several cold Lambdas
+starting at once would race each other through the same migration under pooling, and DDL through a
+transaction-mode pooler is exactly the mix PgBouncer's docs warn against. Tunnel straight to
+Postgres's own 5432, not PgBouncer's 6432, and run it as one deliberate step so a schema change that
+fails stops the deploy instead of taking a running shop down.
 
 ## 3. API on Lambda
 
@@ -63,6 +147,26 @@ dotnet lambda deploy-function
 
 Everything it needs is in `aws-lambda-tools-defaults.json` next to the project, so the command takes
 no flags. Two of those settings are worth understanding rather than copying.
+
+### Putting the function in the database's VPC
+
+This is what makes the private-IP-only database in section 1 reachable at all. Create a second
+security group, `ans-lambda-sg`, then go back and add one inbound rule to `ans-db-sg`: **5432/6432
+from `ans-lambda-sg`**. Nothing else needs to reach the database, so nothing else gets a rule.
+
+`aws-lambda-tools-defaults.json` does not carry the subnet and security group IDs — they are
+specific to this one AWS account, not something to commit for whoever else ever reads this repo.
+Add them once, after creating `ans-lambda-sg`:
+
+```json
+"function-vpc-subnet-ids": "<subnet-id>,<subnet-id>",
+"function-vpc-security-group-ids": "<ans-lambda-sg-id>"
+```
+
+Use the same subnets the EC2 instance is in. A Lambda function placed in a VPC loses its default
+internet route unless a NAT gateway is added — that is not needed here, since this API never calls
+anything outside the VPC, but it does mean a NAT gateway is the fix on the day that stops being
+true, not a reason to skip the VPC in the meantime.
 
 ### Why the managed `dotnet10` runtime
 
@@ -117,7 +221,7 @@ Environment variables:
 
 ```
 ASPNETCORE_ENVIRONMENT      = Production
-ConnectionStrings__Default  = <the pooled connection string>
+ConnectionStrings__Default  = <the PgBouncer connection string from section 1>
 Cors__AllowedOrigins__0     = https://<your-pages-domain>
 Shop__TimeZone              = Asia/Kolkata
 ```
@@ -131,8 +235,11 @@ half past five in the morning would be dated to the previous day.
 
 ### Creating the first account
 
+Through the same SSM tunnel as migrations (section 2):
+
 ```bash
-ConnectionStrings__Default="<connection string>" dotnet run -- --create-owner
+ConnectionStrings__Default="Host=localhost;Port=5432;Database=two_wheeler_spare_parts;Username=ans_app;Password=<pass>;SSL Mode=Disable" \
+  dotnet run -- --create-owner
 ```
 
 Prints a generated password once, to your terminal. It is deliberately not written to the log —
@@ -169,18 +276,49 @@ cached forever.
 
 ## 6. Backups
 
-The managed database has its own snapshots, and they are not yours — they live in the same account
-somebody could lose access to. Take your own as well:
+A managed database comes with its own snapshots, restorable from the same provider's dashboard even
+if the shop's own backup ever falls over. Self-hosted, `backup.sh` **is** the whole safety net —
+there is no fallback behind it. Run it where it needs Docker and a look at the exit code every
+night, which is the EC2 instance itself, not a laptop that might be asleep at 9pm.
 
 ```bash
-export ANS_DATABASE_URL="<connection string>"
-./scripts/backup.sh
+sudo apt install -y git
+git clone <this-repo> /opt/ans-traders   # or just copy backend/scripts/ over
+```
+
+`backup.sh` talks to `ANS_DATABASE_URL` through a throwaway Docker container either way, so pointing
+it at `localhost` — the instance's own Postgres — needs nothing extra installed beyond the Docker
+already on the box from section 1:
+
+```bash
+export ANS_DATABASE_URL="postgresql://ans_app:<pass>@localhost:5432/two_wheeler_spare_parts?sslmode=disable"
+./scripts/backup.sh /var/backups/ans-traders
+```
+
+A dump sitting on the same disk as the database it came from protects against nothing except a bad
+migration — the actual point of a backup is surviving the box, not just a bad `UPDATE`. Sync it off
+the instance in the same cron job, to a bucket the EC2 role can write but not delete from (a bucket
+with versioning and a short lifecycle rule is enough; the instance role only needs `s3:PutObject`):
+
+```
+0 21 * * *  cd /opt/ans-traders/backend && \
+  ANS_DATABASE_URL="postgresql://ans_app:<pass>@localhost:5432/two_wheeler_spare_parts?sslmode=disable" \
+  ./scripts/backup.sh /var/backups/ans-traders && \
+  aws s3 sync /var/backups/ans-traders s3://<your-backup-bucket>/ans-traders/ \
+  >> /var/log/ans-backup.log 2>&1
+```
+
+Verify through the same SSM tunnel used for migrations, from a laptop — this restores into the
+laptop's local Docker Postgres, which is the stronger test regardless of where the dump came from,
+because it proves the dump can be brought back somewhere other than the box that made it:
+
+```bash
+aws s3 cp s3://<your-backup-bucket>/ans-traders/<file>.dump ~/ANS-Traders-Backups/
 ./scripts/verify-backup.sh ~/ANS-Traders-Backups/<file>.dump
 ```
 
-The verify step restores into the local Docker Postgres, whatever the dump came from — which is the
-stronger test, because it proves the dump can be brought back somewhere other than where it was
-made. See `scripts/README.md`.
+**Run this at least once**, and again after any migration. See `scripts/README.md` for what the
+verify step actually checks.
 
 ---
 
@@ -201,6 +339,16 @@ Order inside the deploy job is deliberate: the migration runs first, on the **di
 so the function wakes up to the schema it was built against and a failed migration stops the deploy
 instead of taking a running shop down.
 
+The database has no public IP (section 1), so **two** steps in this job need the same SSM
+port-forward a laptop uses in section 2 — migrate, and the verify step at the end.
+`check-registers.sh` reads the registers over HTTPS through the deployed API, which needs no
+tunnel, but it mints the short-lived session token it signs in with by inserting a row straight into
+Postgres first (see the comment at the top of that script), so it needs `ANS_DATABASE_URL` pointed
+at the same tunnel too. Simplest: open the port-forward once near the start of the job and leave it
+running for both steps, rather than opening and closing it twice. The deploy user's AWS credentials
+need `ssm:StartSession` on the instance in addition to the Lambda/S3 permissions `deploy-function`
+already needs.
+
 ### No S3 bucket, no ECR
 
 At about 10MB the bundle uploads directly, so `deploy-function` needs nothing but credentials and a
@@ -214,10 +362,10 @@ into the deploy.
 
 | Name | What |
 |---|---|
-| `AWS_ACCESS_KEY_ID` | deploy user's key |
+| `AWS_ACCESS_KEY_ID` | deploy user's key — needs `ssm:StartSession` on the DB instance too |
 | `AWS_SECRET_ACCESS_KEY` | deploy user's secret |
-| `DB_CONNECTION_DIRECT` | **direct** connection string — migrations only |
-| `DB_CONNECTION_POOLED` | **pooled** connection string — the register check |
+| `DB_INSTANCE_ID` | the EC2 instance's id, to open the tunnel against |
+| `DB_CONNECTION_DIRECT` | `localhost:5432` connection string, over the tunnel — migrations **and** the verify step's session token |
 | `CLOUDFLARE_API_TOKEN` | token with Pages:Edit |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
 
@@ -265,6 +413,12 @@ S3 and hand back a link, not to page the register.
 **Catalogue import is one request.** Five thousand rows are validated and written together, all or
 nothing. Set the function timeout high enough (60s is a reasonable start) and keep an eye on it.
 
-**A pooled connection and a cold Lambda both take a moment.** Neon's free tier suspends after
-inactivity; the first bill of the morning can take a few seconds while the database wakes and the
-function starts. Neither is broken.
+**A cold Lambda takes a moment.** The database is always up now — a self-hosted EC2 instance does
+not suspend after inactivity the way Neon's free tier did — but the first request against a Lambda
+that has not run in a while still pays a cold start. Not broken, just the first bill of the morning.
+
+**The EC2 instance is a single point of failure the managed option was not.** No automatic failover,
+no point-in-time restore from a provider dashboard — an instance that dies loses the database until
+someone launches a replacement and restores the last backup onto it. Reasonable for one shop; worth
+knowing before assuming otherwise. If that ever stops being an acceptable risk, RDS is the managed
+step up that keeps everything else in this file — VPC, security groups, SSM tunnel — unchanged.
