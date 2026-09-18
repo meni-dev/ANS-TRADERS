@@ -179,7 +179,19 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
               <TableCell align="right" sx={{ ...headerCell, width: 104 }}>Disc %</TableCell>
               <TableCell align="right" sx={{ ...headerCell, width: 72 }}>GST</TableCell>
               <TableCell align="right" sx={{ ...headerCell, width: 130 }}>Amount</TableCell>
-              <TableCell sx={{ ...headerCell, width: 44, pr: 0 }} />
+              <TableCell
+                sx={{
+                  ...headerCell,
+                  width: 44,
+                  pr: 0,
+                  // Pinned so the delete action stays reachable once the table needs its own
+                  // horizontal scroll — otherwise it sits off the right edge of a narrower center
+                  // column and reads as though it disappeared rather than just being off-screen.
+                  position: 'sticky',
+                  right: 0,
+                  bgcolor: 'background.paper',
+                }}
+              />
             </TableRow>
           </TableHead>
 
@@ -286,7 +298,7 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
                     )}
                   </TableCell>
 
-                  <TableCell sx={{ pr: 0 }}>
+                  <TableCell sx={{ pr: 0, position: 'sticky', right: 0, bgcolor: 'background.paper' }}>
                     <Tooltip title={fields.length === 1 ? 'A bill needs at least one line' : 'Remove line'}>
                       <Box component="span">
                         <IconButton
