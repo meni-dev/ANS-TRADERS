@@ -22,7 +22,7 @@ type DocumentFormLayoutProps = {
  * (instead of a fixed share of it) is what actually buys the items table room at a narrower
  * viewport — a proportional split still starves it exactly where the room is scarce.
  */
-const SIDEBAR_WIDTH = 300
+const SIDEBAR_WIDTH = 360
 
 export function DocumentFormLayout({ children, totals, payment }: DocumentFormLayoutProps) {
   return (
