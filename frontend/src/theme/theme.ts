@@ -109,7 +109,9 @@ export const theme = createTheme({
     },
     text: {
       primary: neutral[900],
-      secondary: neutral[500],
+      // One step darker than the neutral ramp's own 500 — labels, captions and helper text sit at
+      // this colour everywhere, and at 500 they read as washed-out rather than deliberately quiet.
+      secondary: neutral[600],
       disabled: neutral[400],
     },
     divider: neutral[200],
@@ -122,28 +124,29 @@ export const theme = createTheme({
 
   typography: {
     fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
-    // Page title. Deliberately far smaller than MUI's default h1 — in a dense admin tool an
-    // oversized title pushes the actual data below the fold for no informational gain.
-    h1: { fontSize: '1.375rem', fontWeight: 700, letterSpacing: '-0.015em', lineHeight: 1.3 },
-    h2: { fontSize: '1.125rem', fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.35 },
-    h3: { fontSize: '1rem', fontWeight: 600, letterSpacing: '-0.005em', lineHeight: 1.4 },
-    h4: { fontSize: '0.9375rem', fontWeight: 600, lineHeight: 1.4 },
-    h5: { fontSize: '0.875rem', fontWeight: 600, lineHeight: 1.4 },
-    h6: { fontSize: '0.8125rem', fontWeight: 600, lineHeight: 1.4 },
-    subtitle1: { fontSize: '0.9375rem', fontWeight: 500, lineHeight: 1.5 },
-    subtitle2: { fontSize: '0.8125rem', fontWeight: 600, lineHeight: 1.5 },
-    body1: { fontSize: '0.875rem', lineHeight: 1.6 },
-    body2: { fontSize: '0.8125rem', lineHeight: 1.6 },
-    caption: { fontSize: '0.75rem', lineHeight: 1.5 },
+    // Page title. Still well short of MUI's default h1 — in a dense admin tool an oversized title
+    // pushes the actual data below the fold for no informational gain — but every size in this
+    // scale was reading as small at typical viewing distance, so each is up a notch from before.
+    h1: { fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.015em', lineHeight: 1.3 },
+    h2: { fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.35 },
+    h3: { fontSize: '1.125rem', fontWeight: 600, letterSpacing: '-0.005em', lineHeight: 1.4 },
+    h4: { fontSize: '1.0625rem', fontWeight: 600, lineHeight: 1.4 },
+    h5: { fontSize: '1rem', fontWeight: 600, lineHeight: 1.4 },
+    h6: { fontSize: '0.9375rem', fontWeight: 600, lineHeight: 1.4 },
+    subtitle1: { fontSize: '1rem', fontWeight: 500, lineHeight: 1.5 },
+    subtitle2: { fontSize: '0.9375rem', fontWeight: 600, lineHeight: 1.5 },
+    body1: { fontSize: '0.9375rem', lineHeight: 1.6 },
+    body2: { fontSize: '0.875rem', lineHeight: 1.6 },
+    caption: { fontSize: '0.8125rem', lineHeight: 1.5 },
     // Used for the small grey group headings inside forms and the sidebar.
     overline: {
-      fontSize: '0.6875rem',
+      fontSize: '0.75rem',
       fontWeight: 700,
       letterSpacing: '0.08em',
       textTransform: 'uppercase',
       lineHeight: 1.6,
     },
-    button: { fontSize: '0.875rem', fontWeight: 600, letterSpacing: 0 },
+    button: { fontSize: '0.9375rem', fontWeight: 600, letterSpacing: 0 },
   },
 
   // Base unit for inputs and small controls. Kept low deliberately: sx `borderRadius: n`
@@ -194,9 +197,9 @@ export const theme = createTheme({
           paddingInline: 16,
           whiteSpace: 'nowrap',
         },
-        sizeSmall: { paddingBlock: 5, paddingInline: 12, fontSize: '0.8125rem' },
+        sizeSmall: { paddingBlock: 5, paddingInline: 12, fontSize: '0.875rem' },
         sizeMedium: { paddingBlock: 8 },
-        sizeLarge: { paddingBlock: 10, fontSize: '0.9375rem' },
+        sizeLarge: { paddingBlock: 10, fontSize: '1rem' },
         contained: {
           boxShadow: shadow.sm,
           '&:hover': { boxShadow: shadow.md },
@@ -207,7 +210,7 @@ export const theme = createTheme({
           '&:hover': { borderColor: neutral[400], backgroundColor: neutral[50] },
         },
         text: {
-          color: neutral[600],
+          color: neutral[700],
           '&:hover': { backgroundColor: neutral[100] },
         },
       },
@@ -221,7 +224,7 @@ export const theme = createTheme({
         root: ({ ownerState }) => ({
           borderRadius: 6,
           ...(ownerState.color === 'default' && {
-            color: neutral[500],
+            color: neutral[600],
             '&:hover': { backgroundColor: neutral[100], color: neutral[800] },
           }),
         }),
@@ -338,13 +341,13 @@ export const theme = createTheme({
             transition: 'none',
             maxWidth: '100%',
             marginBottom: 4,
-            fontSize: '0.75rem',
+            fontSize: '0.8125rem',
             fontWeight: 600,
             lineHeight: 1.4,
-            color: neutral[600],
+            color: neutral[700],
             // Focus is already announced by the border and the ring around the box. A caption that
             // changes colour as well is noise on a form with a dozen fields.
-            '&.Mui-focused': { color: neutral[600] },
+            '&.Mui-focused': { color: neutral[700] },
             '&.Mui-error': { color: danger.text },
             '&.Mui-disabled': { color: neutral[400] },
           },
@@ -358,7 +361,7 @@ export const theme = createTheme({
         root: {
           marginLeft: 2,
           marginTop: 4,
-          fontSize: '0.75rem',
+          fontSize: '0.8125rem',
           '&.Mui-error': { color: danger.text },
         },
       },
@@ -367,8 +370,8 @@ export const theme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: { fontWeight: 600, borderRadius: 5 },
-        sizeSmall: { height: 22, fontSize: '0.6875rem' },
-        outlined: { borderColor: neutral[300], color: neutral[600] },
+        sizeSmall: { height: 23, fontSize: '0.75rem' },
+        outlined: { borderColor: neutral[300], color: neutral[700] },
       },
     },
 
@@ -377,7 +380,7 @@ export const theme = createTheme({
       styleOverrides: {
         tooltip: {
           backgroundColor: neutral[800],
-          fontSize: '0.75rem',
+          fontSize: '0.8125rem',
           fontWeight: 500,
           borderRadius: 5,
           paddingBlock: 6,
@@ -407,7 +410,7 @@ export const theme = createTheme({
 
     MuiDialogTitle: {
       styleOverrides: {
-        root: { fontSize: '1.0625rem', fontWeight: 700, letterSpacing: '-0.01em' },
+        root: { fontSize: '1.1875rem', fontWeight: 700, letterSpacing: '-0.01em' },
       },
     },
 
@@ -431,7 +434,7 @@ export const theme = createTheme({
 
     MuiListItemIcon: {
       styleOverrides: {
-        root: { minWidth: 34, color: neutral[500] },
+        root: { minWidth: 34, color: neutral[600] },
       },
     },
 
@@ -453,14 +456,14 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 8,
-          fontSize: '0.8125rem',
+          fontSize: '0.875rem',
           // A message long enough to wrap should read as one block, so the icon sits with the
           // first line rather than floating in the middle of two.
           alignItems: 'flex-start',
           paddingBlock: 8,
           '& .MuiAlert-icon': { paddingBlock: 1, marginRight: 10 },
           '& .MuiAlert-message': { paddingBlock: 0, lineHeight: 1.55 },
-          '& .MuiAlertTitle-root': { fontSize: '0.8125rem', marginBottom: 2 },
+          '& .MuiAlertTitle-root': { fontSize: '0.875rem', marginBottom: 2 },
 
           // A hairline border carries the boundary so the fill can stay near-white. The old solid
           // pink block shouted louder than the message inside it.
@@ -510,7 +513,7 @@ export const theme = createTheme({
 
     MuiMenuItem: {
       styleOverrides: {
-        root: { fontSize: '0.875rem', borderRadius: 5, marginInline: 4 },
+        root: { fontSize: '0.9375rem', borderRadius: 5, marginInline: 4 },
       },
     },
   },
