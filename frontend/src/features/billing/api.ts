@@ -31,6 +31,7 @@ export function createInvoice(values: CreateInvoiceFormValues) {
       walkInName: values.walkInName || null,
       invoiceDate: values.invoiceDate,
       paymentMode: values.paymentMode,
+      billDiscountAmount: values.billDiscountAmount,
       amountPaid: values.amountPaid,
       notes: values.notes || null,
       items: values.items.map(toLineRequest),
