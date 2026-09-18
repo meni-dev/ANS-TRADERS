@@ -10,7 +10,7 @@ import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Grid, InputAd
 import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useCreateCustomer } from '../hooks'
-import { createCustomerSchema, type CreateCustomerFormValues } from '../types'
+import { createCustomerSchema, type CreateCustomerFormValues, type CustomerDto } from '../types'
 import { CustomerFormFields } from './CustomerFormFields'
 
 const defaultValues: CreateCustomerFormValues = {
@@ -32,9 +32,11 @@ const defaultValues: CreateCustomerFormValues = {
 type CreateCustomerDialogProps = {
   open: boolean
   onClose: () => void
+  /** Called with the saved customer right before the dialog closes — lets a caller select it. */
+  onCreated?: (customer: CustomerDto) => void
 }
 
-export function CreateCustomerDialog({ open, onClose }: CreateCustomerDialogProps) {
+export function CreateCustomerDialog({ open, onClose, onCreated }: CreateCustomerDialogProps) {
   const { notify } = useNotification()
   const [serverError, setServerError] = useState<string | null>(null)
   const form = useForm<CreateCustomerFormValues>({
@@ -53,9 +55,10 @@ export function CreateCustomerDialog({ open, onClose }: CreateCustomerDialogProp
   const onSubmit = form.handleSubmit(async (values) => {
     setServerError(null)
     try {
-      await createCustomer.mutateAsync(values)
+      const created = await createCustomer.mutateAsync(values)
       notify(`Customer "${values.name}" created`)
       form.reset(defaultValues)
+      onCreated?.(created)
       onClose()
     } catch (error) {
       setServerError(describeError(error, 'Something went wrong. Please try again.'))

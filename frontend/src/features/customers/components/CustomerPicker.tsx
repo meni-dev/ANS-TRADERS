@@ -1,8 +1,15 @@
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlineOutlined'
 import { Autocomplete, Box, TextField, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useCustomers } from '../hooks'
 import type { CustomerDto } from '../types'
+
+// A sentinel row rather than a second control: the counter is already looking at this field when
+// it realises the customer is not on file, so the way in is right there in the dropdown rather
+// than a separate button competing for space.
+const ADD_NEW_ID = '__add_new_customer__'
+const addNewOption = { id: ADD_NEW_ID, name: 'Add new customer', phone: '' } as CustomerDto
 
 type CustomerPickerProps = {
   value: CustomerDto | null
@@ -10,6 +17,8 @@ type CustomerPickerProps = {
   error?: string
   label?: string
   helperText?: string
+  /** Offers "Add new customer" in the dropdown; opens a create dialog when picked. */
+  onAddNew?: () => void
 }
 
 /**
@@ -22,6 +31,7 @@ export function CustomerPicker({
   error,
   label = 'Customer',
   helperText,
+  onAddNew,
 }: CustomerPickerProps) {
   const [input, setInput] = useState('')
   const debouncedInput = useDebouncedValue(input)
@@ -33,17 +43,25 @@ export function CustomerPicker({
     pageSize: 20,
   })
 
+  const options = [...(data?.items ?? []), ...(onAddNew ? [addNewOption] : [])]
+
   return (
     <Autocomplete
       value={value}
-      onChange={(_, next) => onChange(next)}
+      onChange={(_, next) => {
+        if (next?.id === ADD_NEW_ID) {
+          onAddNew?.()
+          return
+        }
+        onChange(next)
+      }}
       onInputChange={(_, next, reason) => {
         if (reason !== 'reset') setInput(next)
       }}
-      options={data?.items ?? []}
+      options={options}
       loading={isFetching}
       filterOptions={(x) => x}
-      getOptionLabel={(option) => option.name}
+      getOptionLabel={(option) => (option.id === ADD_NEW_ID ? 'Add new customer' : option.name)}
       isOptionEqualToValue={(option, selected) => option.id === selected.id}
       noOptionsText={debouncedInput ? 'No matching customers' : 'Start typing a name or phone number'}
       size="small"
@@ -58,6 +76,20 @@ export function CustomerPicker({
       )}
       renderOption={(props, option) => {
         const { key, ...optionProps } = props as typeof props & { key: string }
+
+        if (option.id === ADD_NEW_ID) {
+          return (
+            <Box
+              component="li"
+              key={key}
+              {...optionProps}
+              sx={{ display: 'flex !important', alignItems: 'center', gap: 1, py: 1, color: 'primary.main' }}
+            >
+              <AddCircleOutlineIcon sx={{ fontSize: 18 }} />
+              <Typography sx={{ fontSize: 13.5, fontWeight: 600 }}>Add new customer</Typography>
+            </Box>
+          )
+        }
 
         return (
           <Box component="li" key={key} {...optionProps} sx={{ display: 'block !important', py: 1 }}>

@@ -1,4 +1,5 @@
 import { ProductPicker } from '@/components/document/ProductPicker'
+import { CreateProductDialog } from '@/features/products/components/CreateProductDialog'
 import type { ProductDto } from '@/features/products/types'
 import { computeLine } from '@/lib/documents/gst'
 import { emptyLine, type DocumentLineValues } from '@/lib/documents/types'
@@ -20,6 +21,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import { useState } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 
 type LineItemsEditorProps = {
@@ -81,6 +83,10 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
 
   // Watching the array keeps the per-row amounts live as the user types.
   const items = (useWatch({ control, name: 'items' }) ?? []) as DocumentLineValues[]
+
+  // Which row's "Add new product" was picked, so the created part lands back in that same row
+  // rather than requiring a second trip through the picker.
+  const [addProductForIndex, setAddProductForIndex] = useState<number | null>(null)
 
   const chosenProductIds = items.map((line) => line?.productId).filter(Boolean)
 
@@ -175,6 +181,7 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
                       excludeIds={chosenProductIds}
                       showStock={showStock}
                       autoFocus={index === fields.length - 1 && !line.productId}
+                      onAddNew={() => setAddProductForIndex(index)}
                     />
                   </TableCell>
 
@@ -259,6 +266,15 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
           <Typography sx={{ fontSize: 12.5, color: 'error.dark' }}>{itemsError}</Typography>
         )}
       </Stack>
+
+      <CreateProductDialog
+        open={addProductForIndex !== null}
+        onClose={() => setAddProductForIndex(null)}
+        onCreated={(product) => {
+          if (addProductForIndex !== null) handleProductChange(addProductForIndex, product)
+          setAddProductForIndex(null)
+        }}
+      />
     </Box>
   )
 }

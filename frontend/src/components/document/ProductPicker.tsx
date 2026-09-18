@@ -2,8 +2,14 @@ import { useProducts } from '@/features/products/hooks'
 import type { ProductDto } from '@/features/products/types'
 import { formatQuantity } from '@/lib/format'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlineOutlined'
 import { Autocomplete, Box, TextField, Typography } from '@mui/material'
 import { useState } from 'react'
+
+// A sentinel row rather than a separate button: the line is already open waiting for a part, so
+// the way to mint one that is not in the master yet belongs right there in the same dropdown.
+const ADD_NEW_ID = '__add_new_product__'
+const addNewOption = { id: ADD_NEW_ID, itemName: 'Add new product', partNumber: '' } as ProductDto
 
 type ProductPickerProps = {
   value: ProductDto | null
@@ -14,6 +20,8 @@ type ProductPickerProps = {
   autoFocus?: boolean
   /** Annotates each option with its stock. Off for purchases, where stock is not a constraint. */
   showStock?: boolean
+  /** Offers "Add new product" in the dropdown; opens a create dialog when picked. */
+  onAddNew?: () => void
 }
 
 /**
@@ -27,6 +35,7 @@ export function ProductPicker({
   excludeIds = [],
   autoFocus,
   showStock,
+  onAddNew,
 }: ProductPickerProps) {
   const [input, setInput] = useState('')
   const debouncedInput = useDebouncedValue(input)
@@ -41,11 +50,18 @@ export function ProductPicker({
   const options = (data?.items ?? []).filter(
     (product) => product.id === value?.id || !excludeIds.includes(product.id),
   )
+  if (onAddNew) options.push(addNewOption)
 
   return (
     <Autocomplete
       value={value}
-      onChange={(_, next) => onChange(next)}
+      onChange={(_, next) => {
+        if (next?.id === ADD_NEW_ID) {
+          onAddNew?.()
+          return
+        }
+        onChange(next)
+      }}
       // The input is left uncontrolled — MUI shows the chosen product's label on its own. This
       // only mirrors what the user types so the search term can be debounced off it.
       onInputChange={(_, next, reason) => {
@@ -56,7 +72,9 @@ export function ProductPicker({
       // The list is already the server's ranked search result; re-filtering it locally would
       // discard matches on fields the client never sees.
       filterOptions={(x) => x}
-      getOptionLabel={(option) => `${option.partNumber} · ${option.itemName}`}
+      getOptionLabel={(option) =>
+        option.id === ADD_NEW_ID ? 'Add new product' : `${option.partNumber} · ${option.itemName}`
+      }
       isOptionEqualToValue={(option, selected) => option.id === selected.id}
       noOptionsText={debouncedInput ? 'No matching parts' : 'Start typing a part number or name'}
       size="small"
@@ -71,6 +89,21 @@ export function ProductPicker({
       )}
       renderOption={(props, option) => {
         const { key, ...optionProps } = props as typeof props & { key: string }
+
+        if (option.id === ADD_NEW_ID) {
+          return (
+            <Box
+              component="li"
+              key={key}
+              {...optionProps}
+              sx={{ display: 'flex !important', alignItems: 'center', gap: 1, py: 1, color: 'primary.main' }}
+            >
+              <AddCircleOutlineIcon sx={{ fontSize: 18 }} />
+              <Typography sx={{ fontSize: 13.5, fontWeight: 600 }}>Add new product</Typography>
+            </Box>
+          )
+        }
+
         const vehicle = [option.vehicleBrand, option.vehicleModel].filter(Boolean).join(' · ')
 
         return (

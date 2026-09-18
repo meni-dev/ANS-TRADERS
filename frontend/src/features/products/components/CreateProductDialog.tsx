@@ -9,7 +9,7 @@ import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Grid } from '
 import { useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useCreateProduct } from '../hooks'
-import { createProductSchema, type CreateProductFormValues } from '../types'
+import { createProductSchema, type CreateProductFormValues, type ProductDto } from '../types'
 import { FormSection } from '@/components/form/FormSection'
 import { ProductFormFields } from './ProductFormFields'
 
@@ -34,9 +34,11 @@ const defaultValues: CreateProductFormValues = {
 type CreateProductDialogProps = {
   open: boolean
   onClose: () => void
+  /** Called with the saved product right before the dialog closes — lets a caller select it. */
+  onCreated?: (product: ProductDto) => void
 }
 
-export function CreateProductDialog({ open, onClose }: CreateProductDialogProps) {
+export function CreateProductDialog({ open, onClose, onCreated }: CreateProductDialogProps) {
   const { notify } = useNotification()
   const [serverError, setServerError] = useState<string | null>(null)
   const form = useForm<CreateProductFormValues>({
@@ -55,9 +57,10 @@ export function CreateProductDialog({ open, onClose }: CreateProductDialogProps)
   const onSubmit = form.handleSubmit(async (values) => {
     setServerError(null)
     try {
-      await createProduct.mutateAsync(values)
+      const created = await createProduct.mutateAsync(values)
       notify(`Product "${values.itemName}" created`)
       form.reset(defaultValues)
+      onCreated?.(created)
       onClose()
     } catch (error) {
       setServerError(describeError(error, 'Something went wrong. Please try again.'))

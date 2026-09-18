@@ -12,6 +12,7 @@ import { FormSection } from '@/components/form/FormSection'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFTextField } from '@/components/form/RHFTextField'
 import { useShopSettings } from '@/features/settings/hooks'
+import { CreateCustomerDialog } from '@/features/customers/components/CreateCustomerDialog'
 import { CustomerPicker } from '@/features/customers/components/CustomerPicker'
 import { CustomerCreditStrip } from '@/features/payments/components/CustomerCreditStrip'
 import type { CustomerDto } from '@/features/customers/types'
@@ -45,6 +46,7 @@ export function InvoiceFormPage() {
   const { data: shop } = useShopSettings()
   const [serverError, setServerError] = useState<string | null>(null)
   const [customer, setCustomer] = useState<CustomerDto | null>(null)
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false)
 
   const form = useForm<CreateInvoiceFormValues>({
     resolver: zodResolver(createInvoiceSchema),
@@ -172,6 +174,7 @@ export function InvoiceFormPage() {
                     value={customer}
                     onChange={handleCustomerChange}
                     helperText="Leave empty for a walk-in"
+                    onAddNew={() => setAddCustomerOpen(true)}
                   />
                   {/* Warns, never blocks: who gets credit is the owner's call, and a screen that
                       refuses him is a screen he learns to work around. */}
@@ -234,6 +237,12 @@ export function InvoiceFormPage() {
           </Stack>
         </form>
       </FormProvider>
+
+      <CreateCustomerDialog
+        open={addCustomerOpen}
+        onClose={() => setAddCustomerOpen(false)}
+        onCreated={handleCustomerChange}
+      />
     </Box>
   )
 }
