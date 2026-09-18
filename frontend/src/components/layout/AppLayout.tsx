@@ -251,6 +251,20 @@ export function AppLayout() {
   )
   const [paletteOpen, setPaletteOpen] = useState(false)
 
+  // The invoice and purchase forms are the one place in the app where horizontal room is actually
+  // scarce — a sticky totals/payment sidebar next to a wide item table. Collapsing the rail there
+  // buys back real space without touching the sidebar's remembered state everywhere else: this
+  // sets the visual state directly (not through toggleSidebar, so it never writes to
+  // localStorage), and the cleanup restores whatever the user's own preference was the moment they
+  // navigate elsewhere.
+  useEffect(() => {
+    const isDocumentForm = location.pathname === '/billing/new' || location.pathname === '/purchases/new'
+    if (!isDocumentForm) return
+
+    setCollapsed(true)
+    return () => setCollapsed(localStorage.getItem(SIDEBAR_KEY) === 'collapsed')
+  }, [location.pathname])
+
   const toggleSidebar = useCallback(() => {
     setCollapsed((prev) => {
       localStorage.setItem(SIDEBAR_KEY, prev ? 'expanded' : 'collapsed')
