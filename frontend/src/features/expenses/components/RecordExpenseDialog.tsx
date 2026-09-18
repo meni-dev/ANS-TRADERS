@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
 import { RHFTextField } from '@/components/form/RHFTextField'
@@ -67,7 +68,7 @@ export function RecordExpenseDialog({ onClose }: { onClose: () => void }) {
         disabled={createExpense.isPending}
       />
       <FormProvider {...form}>
-        <Box component="form" onSubmit={form.handleSubmit(onSubmit)}>
+        <Box component="form" onSubmit={form.handleSubmit(onSubmit)} onKeyDownCapture={handleEnterAsTab}>
           <DialogContent dividers>
             <Stack spacing={2}>
               {serverError ? <Alert severity="error">{serverError}</Alert> : null}
@@ -113,7 +114,7 @@ export function RecordExpenseDialog({ onClose }: { onClose: () => void }) {
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, py: 2 }}>
-            <Button onClick={onClose} disabled={createExpense.isPending}>
+            <Button onClick={onClose} disabled={createExpense.isPending} tabIndex={-1}>
               Cancel
             </Button>
             <Button type="submit" variant="contained" disabled={createExpense.isPending}>

@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFTextField } from '@/components/form/RHFTextField'
 import { formatCurrency, todayIso } from '@/lib/format'
@@ -66,7 +67,7 @@ export function BounceChequeDialog({ cheque, onClose }: BounceChequeDialogProps)
         disabled={bounceCheque.isPending}
       />
       <FormProvider {...form}>
-        <Box component="form" onSubmit={form.handleSubmit(onSubmit)}>
+        <Box component="form" onSubmit={form.handleSubmit(onSubmit)} onKeyDownCapture={handleEnterAsTab}>
           <DialogContent dividers>
             <Stack spacing={2}>
               {serverError ? <Alert severity="error">{serverError}</Alert> : null}
@@ -106,7 +107,7 @@ export function BounceChequeDialog({ cheque, onClose }: BounceChequeDialogProps)
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, py: 2 }}>
-            <Button onClick={onClose} disabled={bounceCheque.isPending}>
+            <Button onClick={onClose} disabled={bounceCheque.isPending} tabIndex={-1}>
               Cancel
             </Button>
             <Button type="submit" variant="contained" color="error" disabled={bounceCheque.isPending}>

@@ -2,6 +2,7 @@ import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
+import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
@@ -83,6 +84,7 @@ export function CreateProductDialog({ open, onClose, onCreated }: CreateProductD
         <form
           onSubmit={onSubmit}
           noValidate
+          onKeyDownCapture={handleEnterAsTab}
           // Lets the content pane be the only scrolling region, so the header above and the
           // action bar below stay put however long the form gets.
           style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
@@ -123,7 +125,12 @@ export function CreateProductDialog({ open, onClose, onCreated }: CreateProductD
 
           <DialogActions sx={{ px: 3, py: 2, gap: 1, flexShrink: 0 }}>
             <Box sx={{ flexGrow: 1 }} />
-            <Button onClick={handleClose} disabled={createProduct.isPending} variant="outlined">
+            <Button
+              onClick={handleClose}
+              disabled={createProduct.isPending}
+              variant="outlined"
+              tabIndex={-1}
+            >
               Cancel
             </Button>
             <Button type="submit" variant="contained" loading={createProduct.isPending}>

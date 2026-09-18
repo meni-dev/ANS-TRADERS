@@ -20,6 +20,7 @@ import {
 import { useState } from 'react'
 import { FormProvider, useForm, useWatch } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
+import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
 import { RHFTextField } from '@/components/form/RHFTextField'
@@ -108,7 +109,7 @@ export function RecordPaymentPage() {
 
   return (
     <FormProvider {...form}>
-      <Box component="form" onSubmit={form.handleSubmit(onSubmit)}>
+      <Box component="form" onSubmit={form.handleSubmit(onSubmit)} onKeyDownCapture={handleEnterAsTab}>
         <Stack spacing={2.5}>
           <PageHeader
             title={isReceipt ? 'Record a receipt' : 'Record a payment'}
@@ -280,7 +281,7 @@ export function RecordPaymentPage() {
           </Paper>
 
           <Stack direction="row" spacing={1.5} sx={{ justifyContent: 'flex-end' }}>
-            <Button onClick={() => navigate('/accounts/payments')}>Cancel</Button>
+            <Button onClick={() => navigate('/accounts/payments')} tabIndex={-1}>Cancel</Button>
             <Button type="submit" variant="contained" disabled={recordPayment.isPending}>
               {recordPayment.isPending ? 'Recording…' : isReceipt ? 'Record receipt' : 'Record payment'}
             </Button>

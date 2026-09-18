@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { FormSection } from '@/components/form/FormSection'
+import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
 import { RHFTextField } from '@/components/form/RHFTextField'
 import { INDIAN_STATES } from '@/lib/indianStates'
@@ -110,7 +111,7 @@ export function SettingsPage() {
       />
 
       <FormProvider {...form}>
-        <form onSubmit={onSubmit} noValidate>
+        <form onSubmit={onSubmit} noValidate onKeyDownCapture={handleEnterAsTab}>
           {serverError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {serverError}

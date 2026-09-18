@@ -2,6 +2,7 @@ import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
+import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
 import { RHFTextField } from '@/components/form/RHFTextField'
@@ -81,7 +82,7 @@ export function AdjustStockDialog({ product, onClose }: AdjustStockDialogProps) 
       />
 
       <FormProvider {...form}>
-        <form onSubmit={onSubmit} noValidate>
+        <form onSubmit={onSubmit} noValidate onKeyDownCapture={handleEnterAsTab}>
           <DialogContent dividers sx={{ px: 3, py: 2.5, bgcolor: 'grey.50' }}>
             {serverError && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -153,7 +154,12 @@ export function AdjustStockDialog({ product, onClose }: AdjustStockDialogProps) 
 
           <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
             <Box sx={{ flexGrow: 1 }} />
-            <Button onClick={handleClose} disabled={adjustStock.isPending} variant="outlined">
+            <Button
+              onClick={handleClose}
+              disabled={adjustStock.isPending}
+              variant="outlined"
+              tabIndex={-1}
+            >
               Cancel
             </Button>
             <Button

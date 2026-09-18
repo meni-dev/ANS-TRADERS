@@ -2,6 +2,7 @@ import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
+import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { FormSection } from '@/components/form/FormSection'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -78,6 +79,7 @@ export function CreateSupplierDialog({ open, onClose }: CreateSupplierDialogProp
         <form
           onSubmit={onSubmit}
           noValidate
+          onKeyDownCapture={handleEnterAsTab}
           style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
         >
           <DialogContent
@@ -109,7 +111,12 @@ export function CreateSupplierDialog({ open, onClose }: CreateSupplierDialogProp
 
           <DialogActions sx={{ px: 3, py: 2, gap: 1, flexShrink: 0 }}>
             <Box sx={{ flexGrow: 1 }} />
-            <Button onClick={handleClose} disabled={createSupplier.isPending} variant="outlined">
+            <Button
+              onClick={handleClose}
+              disabled={createSupplier.isPending}
+              variant="outlined"
+              tabIndex={-1}
+            >
               Cancel
             </Button>
             <Button type="submit" variant="contained" loading={createSupplier.isPending}>
