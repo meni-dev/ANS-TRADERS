@@ -21,7 +21,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 
 type LineItemsEditorProps = {
@@ -41,11 +41,17 @@ function NumberCell({
   align = 'right',
   adornment,
   width,
+  skipTab,
+  enterClickSelector,
 }: {
   name: string
   align?: 'left' | 'right'
   adornment?: string
   width: number
+  /** Off the tab path — the product master already fills this in, so tabbing rarely needs to stop here. */
+  skipTab?: boolean
+  /** CSS selector to click on Enter instead of moving to the next field in tab order. */
+  enterClickSelector?: string
 }) {
   const { register, formState } = useFormContext()
   const path = name.split('.')
@@ -63,7 +69,12 @@ function NumberCell({
       error={!!error}
       sx={{ width }}
       slotProps={{
-        htmlInput: { step: 'any', style: { textAlign: align, fontVariantNumeric: 'tabular-nums' } },
+        htmlInput: {
+          step: 'any',
+          style: { textAlign: align, fontVariantNumeric: 'tabular-nums' },
+          tabIndex: skipTab ? -1 : undefined,
+          ...(enterClickSelector ? { 'data-enter-click': enterClickSelector } : {}),
+        },
         input: adornment
           ? { startAdornment: <InputAdornment position="start">{adornment}</InputAdornment> }
           : undefined,
@@ -83,6 +94,38 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
 
   // Watching the array keeps the per-row amounts live as the user types.
   const items = (useWatch({ control, name: 'items' }) ?? []) as DocumentLineValues[]
+
+  // Row to focus once a line is appended by hand. A plain autoFocus prop is not enough: append()
+  // and this component's own state land in separate renders, so by the time the new row's own
+  // first render happens, an autoFocus prop computed from state that hasn't caught up yet would
+  // read false — React only honours autoFocus at that exact mount, not on a later update. A ref
+  // read imperatively in an effect after commit has no such race, and stays null on the page's own
+  // initial mount, so the customer/walk-in field's own default focus is never stolen by row one.
+  const pendingFocusIndex = useRef<number | null>(null)
+  const tableBodyRef = useRef<HTMLTableSectionElement>(null)
+
+  const addLine = () => {
+    pendingFocusIndex.current = fields.length
+    append({ ...emptyLine })
+  }
+
+  useEffect(() => {
+    if (pendingFocusIndex.current === null) return
+    const row = tableBodyRef.current?.querySelectorAll('tr')[pendingFocusIndex.current]
+    row?.querySelector<HTMLInputElement>('input')?.focus()
+    pendingFocusIndex.current = null
+  }, [fields.length])
+
+  // Tally's own convention for a stock-item table: Enter keeps minting new rows for as long as
+  // they're filled in, and the way out is an Enter on a row left blank. That blank trailing row
+  // has nothing to submit, so it is dropped here rather than left behind to fail "pick a product"
+  // validation the moment the counter tries to save — unless it is the one row a document must
+  // always have, in which case it stays (empty, and caught by that same validation if it is ever
+  // actually submitted that way).
+  const exitItemEntry = () => {
+    if (fields.length > 1) remove(fields.length - 1)
+    document.getElementById('payment-mode-trigger')?.focus()
+  }
 
   // Which row's "Add new product" was picked, so the created part lands back in that same row
   // rather than requiring a second trip through the picker.
@@ -140,7 +183,7 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
             </TableRow>
           </TableHead>
 
-          <TableBody>
+          <TableBody ref={tableBodyRef}>
             {fields.map((field, index) => {
               const line = items[index] ?? emptyLine
               const amounts = computeLine(
@@ -169,6 +212,8 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
                   } as ProductDto)
                 : null
 
+              const isLastRow = index === fields.length - 1
+
               return (
                 <TableRow key={field.id} sx={{ '& td': { borderColor: 'grey.100', py: 1 } }}>
                   <TableCell sx={{ pl: 0, color: 'text.disabled', fontSize: 12.5 }}>{index + 1}</TableCell>
@@ -180,8 +225,8 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
                       error={rowError}
                       excludeIds={chosenProductIds}
                       showStock={showStock}
-                      autoFocus={index === fields.length - 1 && !line.productId}
                       onAddNew={() => setAddProductForIndex(index)}
+                      enterClickSelector={isLastRow && !line.productId ? '#li-exit-items' : undefined}
                     />
                   </TableCell>
 
@@ -192,7 +237,11 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
                   </TableCell>
 
                   <TableCell align="right">
-                    <NumberCell name={`items.${index}.quantity`} width={88} />
+                    <NumberCell
+                      name={`items.${index}.quantity`}
+                      width={88}
+                      enterClickSelector={isLastRow ? '#li-add-line' : undefined}
+                    />
                     {showStock && line.productId && (
                       // Stock sits under the box being typed into rather than in its own column:
                       // it is only interesting while a quantity is being decided.
@@ -213,11 +262,11 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
                   </TableCell>
 
                   <TableCell align="right">
-                    <NumberCell name={`items.${index}.rate`} width={116} adornment="₹" />
+                    <NumberCell name={`items.${index}.rate`} width={116} adornment="₹" skipTab />
                   </TableCell>
 
                   <TableCell align="right">
-                    <NumberCell name={`items.${index}.discountPercent`} width={88} />
+                    <NumberCell name={`items.${index}.discountPercent`} width={88} skipTab />
                   </TableCell>
 
                   <TableCell align="right">
@@ -245,6 +294,9 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
                           onClick={() => remove(index)}
                           disabled={fields.length === 1}
                           aria-label={`Remove line ${index + 1}`}
+                          // Off the Tab/Enter path: sitting right after Qty, it would otherwise be
+                          // one stray keystroke away from deleting the row just filled in.
+                          tabIndex={-1}
                         >
                           <DeleteOutlineIcon sx={{ fontSize: 18 }} />
                         </IconButton>
@@ -259,13 +311,32 @@ export function LineItemsEditor({ rateSource, isInterState, showStock }: LineIte
       </Box>
 
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mt: 1.5 }}>
-        <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => append({ ...emptyLine })}>
+        <Button
+          id="li-add-line"
+          size="small"
+          variant="outlined"
+          startIcon={<AddIcon />}
+          onClick={addLine}
+          // Off the Tab/Enter path itself: reached instead by the last row's Qty clicking it via
+          // data-enter-click, so one Enter both adds the line and lands in its Item field.
+          tabIndex={-1}
+        >
           Add Line
         </Button>
         {itemsError && (
           <Typography sx={{ fontSize: 12.5, color: 'error.dark' }}>{itemsError}</Typography>
         )}
       </Stack>
+
+      {/* Invisible click target for an empty trailing row's Enter — see exitItemEntry above. */}
+      <button
+        id="li-exit-items"
+        type="button"
+        onClick={exitItemEntry}
+        tabIndex={-1}
+        aria-hidden
+        style={{ display: 'none' }}
+      />
 
       <CreateProductDialog
         open={addProductForIndex !== null}

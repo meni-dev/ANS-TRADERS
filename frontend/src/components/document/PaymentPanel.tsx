@@ -32,7 +32,13 @@ export function PaymentPanel({
     <PanelCard title="Payment">
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <RHFSelectField name="paymentMode" label="Payment Mode" options={[...PAYMENT_MODES]} />
+          <RHFSelectField
+            name="paymentMode"
+            label="Payment Mode"
+            options={[...PAYMENT_MODES]}
+            // Targeted by the item table's "done adding items" exit — see handleEnterAsTab.ts.
+            id="payment-mode-trigger"
+          />
         </Grid>
         {extraField && <Grid size={{ xs: 12, sm: 6 }}>{extraField}</Grid>}
         <Grid size={{ xs: 12, sm: 6 }}>

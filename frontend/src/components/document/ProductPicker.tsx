@@ -22,6 +22,12 @@ type ProductPickerProps = {
   showStock?: boolean
   /** Offers "Add new product" in the dropdown; opens a create dialog when picked. */
   onAddNew?: () => void
+  /**
+   * CSS selector to click on Enter while this field is empty, instead of moving to whatever is
+   * next in tab order — set only on a trailing blank row, so Enter there means "done adding
+   * items" rather than "pick one." See the note in handleEnterAsTab.ts.
+   */
+  enterClickSelector?: string
 }
 
 /**
@@ -36,6 +42,7 @@ export function ProductPicker({
   autoFocus,
   showStock,
   onAddNew,
+  enterClickSelector,
 }: ProductPickerProps) {
   const [input, setInput] = useState('')
   const debouncedInput = useDebouncedValue(input)
@@ -69,6 +76,10 @@ export function ProductPicker({
       }}
       options={options}
       loading={isFetching}
+      // The counter types a part name and hits Enter without reaching for an arrow key — without
+      // this, nothing is highlighted yet, Enter has nothing to confirm, and the keystroke falls
+      // through to the form's own Enter-advances-the-field handling, leaving the line unpicked.
+      autoHighlight
       // The list is already the server's ranked search result; re-filtering it locally would
       // discard matches on fields the client never sees.
       filterOptions={(x) => x}
@@ -81,6 +92,13 @@ export function ProductPicker({
       renderInput={(params) => (
         <TextField
           {...params}
+          slotProps={{
+            ...params.slotProps,
+            htmlInput: {
+              ...params.slotProps?.htmlInput,
+              ...(enterClickSelector ? { 'data-enter-click': enterClickSelector } : {}),
+            },
+          }}
           placeholder="Part number or item name…"
           error={!!error}
           helperText={error}

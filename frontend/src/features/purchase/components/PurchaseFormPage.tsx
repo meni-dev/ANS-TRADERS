@@ -9,6 +9,7 @@ import { PaymentPanel } from '@/components/document/PaymentPanel'
 import { useNotification } from '@/components/feedback/NotificationProvider'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { FormSection } from '@/components/form/FormSection'
+import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFTextField } from '@/components/form/RHFTextField'
 import { useShopSettings } from '@/features/settings/hooks'
 import { SupplierPicker } from '@/features/suppliers/components/SupplierPicker'
@@ -101,7 +102,7 @@ export function PurchaseFormPage() {
 
       <FormProvider {...form}>
         {/* noValidate hands validation to zod — see the note in CreateProductDialog. */}
-        <form onSubmit={onSubmit} noValidate>
+        <form onSubmit={onSubmit} noValidate onKeyDownCapture={handleEnterAsTab}>
           {serverError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {serverError}
@@ -194,7 +195,14 @@ export function PurchaseFormPage() {
           </DocumentFormLayout>
 
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end', mt: 2.5 }}>
-            <Button variant="outlined" onClick={() => navigate('/purchases')} disabled={createPurchase.isPending}>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/purchases')}
+              disabled={createPurchase.isPending}
+              // Off the Enter path on purpose — leaving the purchase unsaved should be a deliberate
+              // click, not something a stray Enter at the end of the form lands on and repeats.
+              tabIndex={-1}
+            >
               Cancel
             </Button>
             <Button type="submit" variant="contained" loading={createPurchase.isPending}>

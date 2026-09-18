@@ -60,6 +60,10 @@ export function CustomerPicker({
       }}
       options={options}
       loading={isFetching}
+      // The counter types a name and hits Enter without reaching for an arrow key — without this,
+      // nothing is highlighted yet, Enter has nothing to confirm, and the keystroke falls through
+      // to the form's own Enter-advances-the-field handling, leaving the customer unpicked.
+      autoHighlight
       filterOptions={(x) => x}
       getOptionLabel={(option) => (option.id === ADD_NEW_ID ? 'Add new customer' : option.name)}
       isOptionEqualToValue={(option, selected) => option.id === selected.id}
