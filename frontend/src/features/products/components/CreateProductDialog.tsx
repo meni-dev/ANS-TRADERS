@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { focusFirstField } from '@/components/form/focusFirstField'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
@@ -69,7 +70,13 @@ export function CreateProductDialog({ open, onClose, onCreated }: CreateProductD
   })
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      slotProps={{ transition: { onEntered: focusFirstField } }}
+    >
       <DialogHeader
         title="Add Product"
         subtitle="Create a new item in the spare parts master."

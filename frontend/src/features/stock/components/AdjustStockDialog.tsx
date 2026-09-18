@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { focusFirstField } from '@/components/form/focusFirstField'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
@@ -72,7 +73,13 @@ export function AdjustStockDialog({ product, onClose }: AdjustStockDialogProps) 
   })
 
   return (
-    <Dialog open onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog
+      open
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{ transition: { onEntered: focusFirstField } }}
+    >
       <DialogHeader
         title="Adjust Stock"
         subtitle={`${product.partNumber} · ${product.itemName}`}
@@ -107,6 +114,7 @@ export function AdjustStockDialog({ product, onClose }: AdjustStockDialogProps) 
                   label="Counted Stock"
                   required
                   helperText={`Actual count, in ${product.uqc}`}
+                  autoFocus
                 />
               </Grid>
               <Grid size={12}>

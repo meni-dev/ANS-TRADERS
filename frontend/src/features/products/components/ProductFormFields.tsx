@@ -45,7 +45,7 @@ export function ProductFormFields() {
       <FormSection title="Identification" caption="How this part is found and referred to.">
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>
-            <RHFTextField name="partNumber" label="Part Number" required />
+            <RHFTextField name="partNumber" label="Part Number" required autoFocus />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
             <RHFTextField name="itemCode" label="Item Code" required />

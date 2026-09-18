@@ -9,10 +9,17 @@ type SupplierPickerProps = {
   onChange: (supplier: SupplierDto | null) => void
   error?: string
   label?: string
+  autoFocus?: boolean
 }
 
 /** Type-ahead over active suppliers, searchable by name or phone — the two things a shop remembers. */
-export function SupplierPicker({ value, onChange, error, label = 'Supplier' }: SupplierPickerProps) {
+export function SupplierPicker({
+  value,
+  onChange,
+  error,
+  label = 'Supplier',
+  autoFocus,
+}: SupplierPickerProps) {
   const [input, setInput] = useState('')
   const debouncedInput = useDebouncedValue(input)
 
@@ -38,7 +45,14 @@ export function SupplierPicker({ value, onChange, error, label = 'Supplier' }: S
       noOptionsText={debouncedInput ? 'No matching suppliers' : 'Start typing a supplier name'}
       size="small"
       renderInput={(params) => (
-        <TextField {...params} label={label} required error={!!error} helperText={error} />
+        <TextField
+          {...params}
+          label={label}
+          required
+          error={!!error}
+          helperText={error}
+          autoFocus={autoFocus}
+        />
       )}
       renderOption={(props, option) => {
         const { key, ...optionProps } = props as typeof props & { key: string }

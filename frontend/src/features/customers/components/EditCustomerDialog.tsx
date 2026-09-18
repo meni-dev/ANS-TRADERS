@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { focusFirstField } from '@/components/form/focusFirstField'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { FormSection } from '@/components/form/FormSection'
@@ -69,7 +70,13 @@ export function EditCustomerDialog({ customer, onClose }: EditCustomerDialogProp
   })
 
   return (
-    <Dialog open onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog
+      open
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      slotProps={{ transition: { onEntered: focusFirstField } }}
+    >
       <DialogHeader
         title="Edit Customer"
         subtitle={customer.name}

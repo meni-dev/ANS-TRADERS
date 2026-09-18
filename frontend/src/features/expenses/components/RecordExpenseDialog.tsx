@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { focusFirstField } from '@/components/form/focusFirstField'
 import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFSelectField } from '@/components/form/RHFSelectField'
@@ -59,7 +60,13 @@ export function RecordExpenseDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Dialog open fullWidth maxWidth="sm" onClose={createExpense.isPending ? undefined : onClose}>
+    <Dialog
+      open
+      fullWidth
+      maxWidth="sm"
+      onClose={createExpense.isPending ? undefined : onClose}
+      slotProps={{ transition: { onEntered: focusFirstField } }}
+    >
       <DialogHeader
         title="Record spend"
         subtitle="Rent, salary, electricity — what it costs to keep the shop open"
@@ -80,6 +87,7 @@ export function RecordExpenseDialog({ onClose }: { onClose: () => void }) {
                     label="Date"
                     type="date"
                     required
+                    autoFocus
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>

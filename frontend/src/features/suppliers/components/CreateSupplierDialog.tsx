@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { focusFirstField } from '@/components/form/focusFirstField'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { FormSection } from '@/components/form/FormSection'
@@ -64,7 +65,13 @@ export function CreateSupplierDialog({ open, onClose }: CreateSupplierDialogProp
   })
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      slotProps={{ transition: { onEntered: focusFirstField } }}
+    >
       <DialogHeader
         title="Add Supplier"
         subtitle="Create a new supplier in the party master."

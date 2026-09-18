@@ -19,6 +19,7 @@ type CustomerPickerProps = {
   helperText?: string
   /** Offers "Add new customer" in the dropdown; opens a create dialog when picked. */
   onAddNew?: () => void
+  autoFocus?: boolean
 }
 
 /**
@@ -32,6 +33,7 @@ export function CustomerPicker({
   label = 'Customer',
   helperText,
   onAddNew,
+  autoFocus,
 }: CustomerPickerProps) {
   const [input, setInput] = useState('')
   const debouncedInput = useDebouncedValue(input)
@@ -76,6 +78,7 @@ export function CustomerPicker({
           error={!!error}
           helperText={error ?? helperText}
           placeholder="Search by name or phone…"
+          autoFocus={autoFocus}
         />
       )}
       renderOption={(props, option) => {

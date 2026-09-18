@@ -145,6 +145,7 @@ export function PurchaseFormPage() {
                     value={supplier}
                     onChange={handleSupplierChange}
                     error={form.formState.errors.supplierId?.message}
+                    autoFocus
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, md: 4 }}>

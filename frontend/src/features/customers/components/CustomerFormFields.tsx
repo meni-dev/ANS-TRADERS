@@ -10,7 +10,7 @@ export function CustomerFormFields() {
       <FormSection title="Contact" caption="How you reach this customer.">
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 7 }}>
-            <RHFTextField name="name" label="Customer Name" required />
+            <RHFTextField name="name" label="Customer Name" required autoFocus />
           </Grid>
           <Grid size={{ xs: 12, sm: 5 }}>
             <RHFTextField name="phone" label="Phone" required placeholder="9840012345" />

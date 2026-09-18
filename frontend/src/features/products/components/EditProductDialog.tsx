@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { focusFirstField } from '@/components/form/focusFirstField'
 import { FormErrorSummary } from '@/components/form/FormErrorSummary'
 import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
@@ -74,7 +75,13 @@ export function EditProductDialog({ product, onClose }: EditProductDialogProps) 
   })
 
   return (
-    <Dialog open onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog
+      open
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      slotProps={{ transition: { onEntered: focusFirstField } }}
+    >
       <DialogHeader
         title="Edit Product"
         subtitle={product.itemName}

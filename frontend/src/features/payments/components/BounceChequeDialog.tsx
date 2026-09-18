@@ -1,6 +1,7 @@
 import { describeError } from '@/lib/api/errors'
 import { DialogHeader } from '@/components/feedback/DialogHeader'
 import { useNotification } from '@/components/feedback/NotificationProvider'
+import { focusFirstField } from '@/components/form/focusFirstField'
 import { handleEnterAsTab } from '@/components/form/handleEnterAsTab'
 import { RHFNumberField } from '@/components/form/RHFNumberField'
 import { RHFTextField } from '@/components/form/RHFTextField'
@@ -58,7 +59,13 @@ export function BounceChequeDialog({ cheque, onClose }: BounceChequeDialogProps)
   }
 
   return (
-    <Dialog open fullWidth maxWidth="sm" onClose={bounceCheque.isPending ? undefined : onClose}>
+    <Dialog
+      open
+      fullWidth
+      maxWidth="sm"
+      onClose={bounceCheque.isPending ? undefined : onClose}
+      slotProps={{ transition: { onEntered: focusFirstField } }}
+    >
       <DialogHeader
         title="Cheque returned"
         subtitle={`${cheque.chequeNumber} · ${cheque.partyName} · ${formatCurrency(cheque.amount)}`}
@@ -85,6 +92,7 @@ export function BounceChequeDialog({ cheque, onClose }: BounceChequeDialogProps)
                     label="Returned on"
                     type="date"
                     required
+                    autoFocus
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>

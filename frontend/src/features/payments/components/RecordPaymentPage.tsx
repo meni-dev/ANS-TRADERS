@@ -148,6 +148,7 @@ export function RecordPaymentPage() {
                       form.setValue('customerId', next?.id ?? '')
                     }}
                     error={form.formState.errors.customerId?.message}
+                    autoFocus
                   />
                 ) : (
                   <SupplierPicker
@@ -157,6 +158,7 @@ export function RecordPaymentPage() {
                       form.setValue('supplierId', next?.id ?? '')
                     }}
                     error={form.formState.errors.supplierId?.message}
+                    autoFocus
                   />
                 )}
               </Grid>

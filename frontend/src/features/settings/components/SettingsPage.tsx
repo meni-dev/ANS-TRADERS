@@ -122,7 +122,7 @@ export function SettingsPage() {
           <FormSection title="Shop Details" caption="Printed as the seller header on every bill.">
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 6 }}>
-                <RHFTextField name="name" label="Shop Name" required />
+                <RHFTextField name="name" label="Shop Name" required autoFocus />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <RHFTextField
